@@ -1,0 +1,8 @@
+/* SCREEN */
+
+.canvas {
+    width: 512px;
+    image-rendering: pixelated;
+    
+    border: 1px solid black;
+}
