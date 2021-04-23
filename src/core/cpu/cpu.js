@@ -113,12 +113,35 @@ const Cpu = function(nes) {
 
     // =============== // Execution //
     this.cpu6502 = new Cpu6502(nes, this);
-    this.opCycle = 0;
-    this.currOp = 0;
-    this.currIns = 0;
-
     this.stepCpu = function() {
+        this.cpu6502.execute();
+        this.cycles ++;
+    };
 
+    // =============== // Loop //
+    this.interval = 0;
+    this.timeout = null;
+
+    this.preMs = 0;
+    this.postMs = 0;
+
+    this.loop = function() {
+        this.preMs = performance.now();
+        this.stepFrame();
+        this.postMs = performance.now();
+
+        this.timeout = setTimeout(() => {
+            cpu.loop();
+        }, this.interval - (this.postMs - this.preMs));
+    };
+
+    this.stopLoop = function() {
+        clearTimeout(this.timeout);
+    };
+
+    this.stepFrame = function() {
+        for (var i = 0; i < this.cyclesPerFrame; i++)
+            this.stepCpu();
     };
 
     // =============== // Bootstrapping //
@@ -132,9 +155,9 @@ const Cpu = function(nes) {
         // Reset cycles
         this.cycles = 0;
 
-        this.opCycle = 0;
-        this.currOp = 0;
-        this.currIns = 0;
+        this.cpu6502.opCycle = 0;
+        this.cpu6502.currOp = 0;
+        this.cpu6502.currIns = 0;
     };
 };
 

@@ -14,6 +14,7 @@ const NES = function() {
     this.setFPS = function(fps) {
         this.fps = fps;
         this.cpu.cyclesPerFrame = this.cpu.cyclesPerSec / fps;
+        this.cpu.interval = 1000 / fps;
     };
 
     this.setPal = function(pal) {
@@ -36,20 +37,32 @@ const NES = function() {
     // =============== // Emulation Methods //
     this.paused = true;
     this.start = function() {
-        if (!paused)
+        if (!this.paused)
             return;
-        paused = false;
+        this.paused = false;
+
+        // Start loop
+        this.cpu.loop();
     };
 
     this.stop = function() {
+        this.paused = true;
 
+        // Stop loop
+        this.cpu.stopLoop();
     };
 
     this.reset = function() {
         this.cpu.reset();
     };
 
+    // =============== // Debug Methods //
+    this.getMaxFps = function() {
+        return 1000 / (this.cpu.postMs - this.cpu.preMs);
+    };
+
     this.reset();
+    this.start();
 };
 
 export default NES;
