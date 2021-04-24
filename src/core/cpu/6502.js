@@ -90,7 +90,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.rotate_left = function(m) {
-        var sum = ((m << 1) | (m >> 7)) & 0xff;
+        var sum = ((m << 1) | cpu.p_c) & 0xff;
 
         cpu.p_c = (m & 0x80) !== 0;
         this.check_zn(sum);
@@ -99,12 +99,34 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.rotate_right = function(m) {
-        var sum = ((m >> 1) | (m << 7)) & 0xff;
+        var sum = ((m >> 1) | (cpu.p_c << 7)) & 0xff;
 
         cpu.p_c = (m & 1) !== 0;
         this.check_zn(sum);
 
         return sum;
+    };
+
+    this.branch = function(cc) {
+        switch (this.opCycle) {
+            case 1:
+                oper = this.fetch() << 24 >> 24;
+                if (!cc)
+                    this.reset_cycles();
+                break;
+            case 2:
+                var pc = cpu.pc; // Save PC for page cross check
+                cpu.pc += oper;
+                cpu.pc &= 0xffff;
+
+                // We on da same page ?
+                if ((cpu.pc & 0xff00) === (pc & 0xff00))
+                    this.reset_cycles();
+                break;
+            case 3:
+                this.reset_cycles();
+                break;
+        }
     };
 
     // =============== // Addressing Modes //
@@ -123,7 +145,7 @@ const Cpu6502 = function(nes, cpu) {
         if (this.opCycle === 1) {
             addr = this.fetch();
         }
-        else {
+        else if (this.opCycle === 2) {
             oper = cpu.read(addr);
         }
     };
@@ -179,6 +201,23 @@ const Cpu6502 = function(nes, cpu) {
         }
     };
 
+    this.indirect = function() {
+        switch (this.opCycle) {
+            case 1:
+                addr = this.fetch();
+                break;
+            case 2:
+                addr |= this.fetch() << 8;
+                break;
+            case 3:
+                // Expend a cycle
+                break;
+            case 4:
+                addr = cpu.read16(addr);
+                break;
+        }
+    };
+
     this.indirect_x = function() {
         switch (this.opCycle) {
             case 1:
@@ -191,9 +230,6 @@ const Cpu6502 = function(nes, cpu) {
                 addr = cpu.read16(oper);
                 break;
             case 4:
-                // Expend cycle
-                break;
-            case 5:
                 oper = cpu.read(addr);
                 break;
         }
@@ -361,7 +397,7 @@ const Cpu6502 = function(nes, cpu) {
     this.asl_zp = function() {
         this.zeropage();
 
-        if (cpu.opCycle === 2) {
+        if (this.opCycle === 2) {
             cpu.write(addr, oper);
         }
         else {
@@ -373,7 +409,7 @@ const Cpu6502 = function(nes, cpu) {
     this.asl_zp_x = function() {
         this.zeropage_x();
 
-        if (cpu.opCycle === 3) {
+        if (this.opCycle === 3) {
             cpu.write(addr, oper);
         }
         else {
@@ -385,7 +421,7 @@ const Cpu6502 = function(nes, cpu) {
     this.asl_abs = function() {
         this.absolute();
 
-        if (cpu.opCycle === 4) {
+        if (this.opCycle === 4) {
             cpu.write(addr, oper);
         }
         else {
@@ -397,7 +433,7 @@ const Cpu6502 = function(nes, cpu) {
     this.asl_abs_x = function() {
         this.absolute_i(cpu.x);
 
-        if (cpu.opCycle === 5) {
+        if (this.opCycle === 5) {
             cpu.write(addr, oper);
         }
         else {
@@ -405,6 +441,343 @@ const Cpu6502 = function(nes, cpu) {
             this.reset_cycles();
         }
     };
+
+    // ----- BCC
+    this.bcc = function() {
+        this.branch(!cpu.p_c);
+    };
+    // ----- BCS
+    this.bcc = function() {
+        this.branch(cpu.p_c);
+    };
+    // ----- BEQ
+    this.bcc = function() {
+        this.branch(cpu.p_z);
+    };
+
+    // ----- BIT
+    this.bit_zp = function() {
+        this.zeropage();
+        if (this.opCycle === 2) {
+            this.bit_test(oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.bit_abs = function() {
+        this.absolute();
+        if (this.opCycle === 3) {
+            this.bit_test(oper);
+            this.reset_cycles();
+        }
+    };
+
+    // ----- BMI
+    this.bmi = function() {
+        this.branch(cpu.p_n);
+    };
+    // ----- BNE
+    this.bne = function() {
+        this.branch(!cpu.p_z);
+    };
+    // ----- BPL
+    this.bpl = function() {
+        this.branch(!cpu.p_n);
+    };
+
+    // ----- BRK
+    this.brk = function() {
+        cpu.p_b = true;
+        this.reset_cycles();
+    };
+
+    // ----- BVC
+    this.bvc = function() {
+        this.branch(!cpu.p_v);
+    };
+    // ----- BVS
+    this.bvs = function() {
+        this.branch(cpu.p_v);
+    };
+
+    // ----- CLC
+    this.clc = function() {
+        cpu.p_c = false;
+        this.reset_cycles();
+    };
+    // ----- CLD
+    this.cld = function() {
+        cpu.p_d = false;
+        this.reset_cycles();
+    };
+    // ----- CLI
+    this.cli = function() {
+        cpu.p_i = false;
+        this.reset_cycles();
+    };
+    // ----- CLV
+    this.cli = function() {
+        cpu.p_v = false;
+        this.reset_cycles();
+    }; 
+
+    // ----- CMP / CPX / CPY
+    // We can use one function cuz
+    // We can pass the register without
+    // Having to do anything to alter its value !
+    this.cmp_imm = function(r) {
+        this.immediate();
+        this.compare(r, oper);
+        this.reset_cycles();
+    };
+
+    this.cmp_zp = function(r) {
+        this.zeropage();
+        if (this.opCycle === 2) {
+            this.compare(r, oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.cmp_zp_x = function(r) {
+        this.zeropage_x();
+        if (this.opCycle === 3) {
+            this.compare(r, oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.cmp_abs = function(r) {
+        this.absolute();
+        if (this.opCycle === 3) {
+            this.compare(r, oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.cmp_abs_x = function(r) {
+        this.absolute_i(cpu.x);
+        if (this.opCycle === 4) {
+            this.compare(r, oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.cmp_abs_y = function(r) {
+        this.absolute_i(cpu.y);
+        if (this.opCycle === 4) {
+            this.compare(r, oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.cmp_ind_x = function(r) {
+        this.indirect_x();
+        if (this.opCycle === 5) {
+            this.compare(r, oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.cmp_ind_y = function(r) {
+        this.indirect_y();
+        if (this.opCycle === 5) {
+            this.compare(r, oper);
+            this.reset_cycles();
+        }
+    };
+
+    // ----- DEC
+    this.dec_zp = function() {
+        this.zeropage();
+        if (this.opCycle === 4) {
+            cpu.a = this.decrement(cpu.a);
+            this.reset_cycles();
+        }
+    };
+
+    this.dec_zp_x = function() {
+        this.zeropage_x();
+        if (this.opCycle === 5) {
+            cpu.a = this.decrement(cpu.a);
+            this.reset_cycles();
+        }
+    };
+
+    this.dec_abs = function() {
+        this.absolute();
+        if (this.opCycle === 5) {
+            cpu.a = this.decrement(cpu.a);
+            this.reset_cycles();
+        }
+    };
+
+    this.dec_abs_x = function() {
+        this.absolute_i(cpu.x);
+        if (this.opCycle === 6) {
+            cpu.a = this.decrement(cpu.a);
+            this.reset_cycles();
+        }
+    };
+
+    // ----- DEX
+    this.dex = function() {
+        cpu.x = this.decrement(cpu.x);
+        this.reset_cycles();
+    };
+    // ----- DEY
+    this.dey = function() {
+        cpu.y = this.decrement(cpu.y);
+        this.reset_cycles();
+    };
+
+    // ----- EOR
+    this.eor_imm = function() {
+        this.immediate();
+        this.ex_or(oper);
+        this.reset_cycles();
+    };
+
+    this.eor_zp = function() {
+        this.zeropage();
+        if (this.opCycle === 2) {
+            this.ex_or(oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.eor_zp_x = function() {
+        this.zeropage_x();
+        if (this.opCycle === 3) {
+            this.ex_or(oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.eor_abs = function() {
+        this.absolute();
+        if (this.opCycle === 3) {
+            this.ex_or(oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.eor_abs_x = function() {
+        this.absolute_i(cpu.x);
+        if (this.opCycle === 4) {
+            this.ex_or(oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.eor_abs_y = function() {
+        this.absolute_i(cpu.y);
+        if (this.opCycle === 4) {
+            this.ex_or(oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.eor_ind_x = function() {
+        this.indirect_x();
+        if (this.opCycle === 5) {
+            this.ex_or(oper);
+            this.reset_cycles();
+        }
+    };
+
+    this.eor_ind_x = function() {
+        this.indirect_y();
+        if (this.opCycle === 5) {
+            this.ex_or(oper);
+            this.reset_cycles();
+        }
+    };
+
+    // ----- INC
+    this.inc_zp = function() {
+        this.zeropage();
+        if (this.opCycle === 4) {
+            cpu.a = this.increment(cpu.a);
+            this.reset_cycles();
+        }
+    };
+
+    this.inc_zp_x = function() {
+        this.zeropage_x();
+        if (this.opCycle === 5) {
+            cpu.a = this.increment(cpu.a);
+            this.reset_cycles();
+        }
+    };
+
+    this.inc_abs = function() {
+        this.absolute();
+        if (this.opCycle === 5) {
+            cpu.a = this.increment(cpu.a);
+            this.reset_cycles();
+        }
+    };
+
+    this.inc_abs_x = function() {
+        this.absolute_i(cpu.x);
+        if (this.opCycle === 6) {
+            cpu.a = this.increment(cpu.a);
+            this.reset_cycles();
+        }
+    };
+
+    // ----- INX
+    this.inx = function() {
+        cpu.x = this.increment(cpu.x);
+        this.reset_cycles();
+    };
+    // ----- INY
+    this.iny = function() {
+        cpu.y = this.increment(cpu.y);
+        this.reset_cycles();
+    };
+
+    // ----- JMP
+    this.jmp_abs = function() {
+        this.absolute();
+        if (this.opCycle === 2) {
+            cpu.pc = addr;
+            this.reset_cycles();
+        }
+    };
+
+    this.jmp_ind = function() {
+        this.indirect();
+        if (this.opCycle === 4) {
+            cpu.pc = addr;
+            this.reset_cycles();
+        }
+    };
+
+    // ----- JSR
+    this.jsr = function() {
+        switch (this.opCycle) {
+            case 1:
+                oper = this.fetch(); // Fetch lower byte
+                break;
+            case 2:
+                // Expend a cycle
+                break;
+            case 3:
+                cpu.push(cpu.pc >> 8);
+                break
+            case 4:
+                cpu.push(cpu.pc & 0xff);
+                break;
+            case 5:
+                cpu.pc = oper | (this.fetch() << 8); // Apply jump
+                this.reset_cycles();
+                break;
+        }
+    };
+
+    // 
 
     // =============== // Fetching and Decoding //
     this.fetch = function() {
