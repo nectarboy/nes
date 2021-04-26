@@ -42,7 +42,7 @@ const Cpu = function(nes) {
     this.cyclesPerSec = 0;
     this.cyclesPerFrame = 0;
 
-    this.cycles = 0;
+    this.cycles = 0; // Unused in cycle accurate mode
 
     // =============== // Reading and Writing //
     this.hasRom = false;
@@ -148,16 +148,12 @@ const Cpu = function(nes) {
     this.reset = function() {
         // Reset internal regs
         this.sp = 0xfd;
-        this.pc = this.read16(0xfffc);
-        this.writeP(0x34);
+        this.pc = 0xc000;
+        this.writeP(0x24);
         this.a = this.x = this.y = 0;
 
         // Reset cycles
-        this.cycles = 0;
-
-        this.cpu6502.opCycle = 0;
-        this.cpu6502.currOp = 0;
-        this.cpu6502.currIns = 0;
+        this.cpu6502.reset_cycles();
     };
 };
 

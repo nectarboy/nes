@@ -6,12 +6,18 @@ const HTML_file = document.getElementById('file');
 
 // NES
 const nes = new NES();
+
 // default settings
 nes.attachCanvas(HTML_canvas);
+// debug
+window.nes = nes;
 
 function startNES(romBuff) {
-    // romBuff can be a Uint8Array buffer or any array contaning raw data
-    // ...
+    // romBuff should be a Uint8Array buffer
+    nes.loadRomBuff(romBuff);
+    nes.stop();
+    nes.reset();
+    nes.start();
 }
 
 // File Event

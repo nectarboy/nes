@@ -56,13 +56,14 @@ const NES = function() {
         this.cpu.reset();
     };
 
+    this.loadRomBuff = function(rom) {
+        this.mem.loadRomBuff(rom);
+    };
+
     // =============== // Debug Methods //
     this.getMaxFps = function() {
         return 1000 / (this.cpu.postMs - this.cpu.preMs);
     };
-
-    this.reset();
-    this.start();
 };
 
 export default NES;
