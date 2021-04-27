@@ -713,7 +713,7 @@ const Cpu6502 = function(nes, cpu) {
         }
     };
 
-    this.eor_ind_x = function() {
+    this.eor_ind_y = function() {
         this.indirect_y();
         if (this.opCycle === 5) {
             this.ex_or(oper);
@@ -1486,6 +1486,7 @@ const Cpu6502 = function(nes, cpu) {
             // 0
             case 0x00: return this.brk;
             case 0x01: return this.ora_ind_x;
+            case 0x05: return this.ora_zp;
             case 0x08: return this.php;
             case 0x09: return this.ora_imm;
             case 0x0a: return this.asl_a;
@@ -1494,7 +1495,9 @@ const Cpu6502 = function(nes, cpu) {
             case 0x18: return this.clc;
             // 2
             case 0x20: return this.jsr;
+            case 0x21: return this.and_ind_x;
             case 0x24: return this.bit_zp;
+            case 0x25: return this.and_zp;
             case 0x28: return this.plp;
             case 0x29: return this.and_imm;
             case 0x2a: return this.rol_a;
@@ -1504,6 +1507,8 @@ const Cpu6502 = function(nes, cpu) {
             case 0x3e: return this.rol_abs;
             // 4
             case 0x40: return this.rti;
+            case 0x41: return this.eor_ind_x;
+            case 0x45: return this.eor_zp;
             case 0x48: return this.pha;
             case 0x49: return this.eor_imm;
             case 0x4a: return this.lsr_a;
@@ -1512,6 +1517,8 @@ const Cpu6502 = function(nes, cpu) {
             case 0x50: return this.bvc;
             // 6
             case 0x60: return this.rts;
+            case 0x61: return this.adc_ind_x;
+            case 0x65: return this.adc_zp;
             case 0x68: return this.pla;
             case 0x69: return this.adc_imm;
             case 0x6a: return this.ror_a;
@@ -1520,6 +1527,7 @@ const Cpu6502 = function(nes, cpu) {
             case 0x78: return this.sei;
             // 8
             case 0x81: return this.sta_ind_x;
+            case 0x84: return this.sty_zp;
             case 0x85: return this.sta_zp;
             case 0x86: return this.stx_zp;
             case 0x88: return this.dey;
@@ -1534,7 +1542,9 @@ const Cpu6502 = function(nes, cpu) {
             case 0xa0: return this.ldy_imm;
             case 0xa1: return this.lda_ind_x;
             case 0xa2: return this.ldx_imm;
+            case 0xa4: return this.ldy_zp;
             case 0xa5: return this.lda_zp;
+            case 0xa6: return this.ldx_zp;
             case 0xa8: return this.tay;
             case 0xa9: return this.lda_imm;
             case 0xaa: return this.tax;
@@ -1546,6 +1556,9 @@ const Cpu6502 = function(nes, cpu) {
             case 0xba: return this.tsx;
             // C
             case 0xc0: cmpOper = cpu.y; return this.cmp_imm;
+            case 0xc1: cmpOper = cpu.a; return this.cmp_ind_x;
+            case 0xc4: cmpOper = cpu.y; return this.cmp_zp;
+            case 0xc5: cmpOper = cpu.a; return this.cmp_zp;
             case 0xc8: return this.iny;
             case 0xc9: cmpOper = cpu.a; return this.cmp_imm;
             case 0xca: return this.dex;
@@ -1554,6 +1567,9 @@ const Cpu6502 = function(nes, cpu) {
             case 0xd8: return this.cld;
             // E
             case 0xe0: cmpOper = cpu.x; return this.cmp_imm;
+            case 0xe1: return this.sbc_ind_x;
+            case 0xe4: cmpOper = cpu.x; return this.cmp_zp;
+            case 0xe5: return this.sbc_zp;
             case 0xe8: return this.inx;
             case 0xe9: return this.sbc_imm;
             case 0xea: return this.nop;

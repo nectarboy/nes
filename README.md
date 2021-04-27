@@ -7,4 +7,15 @@ but since its in js ill prolly remake it in c ! cuz i gotta expand on my c anywa
 
 u need python 3.0+ to run `local.bat`
 
+# todos !
+phat wip btw so come back later !
+
+- cpu (30% ish ? idk)
+- ppu (0%)
+- cartridge (1% ig)
+- apu (0%)
+- joypad (0%)
+- extra stuff (0%)
+- cool emu features (1% cuz its bare min rn)
+
 nectarboy - 2021
