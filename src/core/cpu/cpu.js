@@ -18,7 +18,14 @@ const Cpu = function(nes) {
     this.getP = function() {
         return (
             (this.p_c) | (this.p_z << 1) | (this.p_i << 2) | (this.p_d << 3) |
-            (0x20) | (this.p_b << 4) | (this.p_v << 6) | (this.p_n << 7)
+            (0x30) | (this.p_v << 6) | (this.p_n << 7)
+        );
+    };
+
+    this.getPFull = function() {
+        return (
+            (this.p_c) | (this.p_z << 1) | (this.p_i << 2) | (this.p_d << 3) |
+            (0x20) | (this.p_b << 5) | (this.p_v << 6) | (this.p_n << 7)
         );
     };
 
@@ -105,8 +112,9 @@ const Cpu = function(nes) {
     };
 
     this.pop = function() {
-        var val = this.read(0x100 | this.sp++, val);
+        this.sp++;
         this.sp &= 0xff;
+        var val = this.read(0x100 | this.sp, val);
 
         return val;
     };

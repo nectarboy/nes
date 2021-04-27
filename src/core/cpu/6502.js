@@ -14,13 +14,18 @@ const Cpu6502 = function(nes, cpu) {
     // Micro-ops
     this.add_carry = function(m) {
         var sum = cpu.a + m + cpu.p_c;
-        cpu.a = sum & 0xff;
+        var res = sum & 0xff;
 
         cpu.p_c = sum > 0xff;
-        cpu.p_z = cpu.a === 0;
+        cpu.p_z = res === 0;
+
+        // Signed overflow !
         var aAnd80 = cpu.a & 0x80;
-        cpu.p_v = ((aAnd80 === (m & 0x80)) && (aAnd80 !== (sum & 0x80)));
-        cpu.p_n = aAnd80 !== 0;
+        cpu.p_v = (aAnd80 === (m & 0x80)) && (aAnd80 !== (res & 0x80));
+        // We done wit that
+        cpu.p_n = (res & 0x80) !== 0;
+
+        cpu.a = res;
     };
 
     this.logic_and = function(m) {
@@ -29,7 +34,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.arith_shift_left = function(m) {
-        var sum = m << 1;
+        var sum = (m << 1) & 0xff;
 
         cpu.p_c = (m & 0x80) !== 0;
         this.check_zn(sum);
@@ -38,14 +43,9 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.bit_test = function(m) {
-        var sum = cpu.a & m;
-
-        cpu.p_v = (sum & 0x40) !== 0;
-        this.check_zn(sum);
-    };
-
-    this.branch = function(offset, cc) {
-
+        cpu.p_n = (m & 0x80) !== 0;
+        cpu.p_v = (m & 0x40) !== 0;
+        cpu.p_z = (cpu.a & m) === 0;
     };
 
     this.compare = function(r, m) {
@@ -54,14 +54,15 @@ const Cpu6502 = function(nes, cpu) {
         cpu.p_c = r >= m;
         this.check_zn(sum);
 
-        return sum; // Preserve for subtraction ops maybe !
+        // return sum; // Preserve for subtraction ops maybe !
     };
 
     this.decrement = function(m) {
-        var sum = (m - 1) & 0xff;
-        this.check_zn(sum);
+        m--;
+        m &= 0xff;
+        this.check_zn(m);
 
-        return sum;
+        return m;
     };
 
     this.ex_or = function(m) {
@@ -70,10 +71,11 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.increment = function(m) {
-        var sum = (m + 1) & 0xff;
-        this.check_zn(sum);
+        m++;
+        m &= 0xff;
+        this.check_zn(m);
 
-        return sum;
+        return m;
     };
 
     this.logic_shift_right = function(m) {
@@ -137,6 +139,7 @@ const Cpu6502 = function(nes, cpu) {
 
     var oper = 0;
     var addr = 0;
+    var cmpOper = 0;
 
     this.immediate = function() {
         oper = this.fetch();
@@ -340,7 +343,7 @@ const Cpu6502 = function(nes, cpu) {
         }
     };
 
-    this.and_imm = function() {
+    this.and_zp_x = function() {
         this.zeropage_i(cpu.x);
         if (this.opCycle === 3) {
             this.logic_and(oper);
@@ -389,7 +392,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     // ----- ASL
-    this.asl = function() {
+    this.asl_a = function() {
         cpu.a = this.arith_shift_left(cpu.a);
         this.reset_cycles();
     };
@@ -487,8 +490,30 @@ const Cpu6502 = function(nes, cpu) {
 
     // ----- BRK
     this.brk = function() {
-        cpu.p_b = true;
-        this.reset_cycles();
+        switch (this.opCycle) {
+            case 1:
+                cpu.pc++;
+                cpu.pc &= 0xffff;
+
+                cpu.p_b = true;
+                break;
+            case 2:
+                cpu.push(cpu.pc >> 8);
+                break;
+            case 3:
+                cpu.push(cpu.pc & 0xff);
+                break;
+            case 4:
+                cpu.push(cpu.getP());
+                break;
+            case 5:
+                // Expend cycle
+                break;
+            case 6:
+                cpu.pc = cpu.read16(0xfffe);
+                this.reset_cycles();
+                break;
+        }
     };
 
     // ----- BVC
@@ -525,65 +550,65 @@ const Cpu6502 = function(nes, cpu) {
     // We can use one function cuz
     // We can pass the register without
     // Having to do anything to alter its value !
-    this.cmp_imm = function(r) {
+    this.cmp_imm = function() {
         this.immediate();
 
-        this.compare(r, oper);
+        this.compare(cmpOper, oper);
         this.reset_cycles();
     };
 
-    this.cmp_zp = function(r) {
+    this.cmp_zp = function() {
         this.zeropage();
         if (this.opCycle === 2) {
-            this.compare(r, oper);
+            this.compare(cmpOper, oper);
             this.reset_cycles();
         }
     };
 
-    this.cmp_zp_x = function(r) {
+    this.cmp_zp_x = function() {
         this.zeropage_i(cpu.x);
         if (this.opCycle === 3) {
-            this.compare(r, oper);
+            this.compare(cmpOper, oper);
             this.reset_cycles();
         }
     };
 
-    this.cmp_abs = function(r) {
+    this.cmp_abs = function() {
         this.absolute();
         if (this.opCycle === 3) {
-            this.compare(r, oper);
+            this.compare(cmpOper, oper);
             this.reset_cycles();
         }
     };
 
-    this.cmp_abs_x = function(r) {
+    this.cmp_abs_x = function() {
         this.absolute_i(cpu.x);
         if (this.opCycle === 4) {
-            this.compare(r, oper);
+            this.compare(cmpOper, oper);
             this.reset_cycles();
         }
     };
 
-    this.cmp_abs_y = function(r) {
+    this.cmp_abs_y = function() {
         this.absolute_i(cpu.y);
         if (this.opCycle === 4) {
-            this.compare(r, oper);
+            this.compare(cmpOper, oper);
             this.reset_cycles();
         }
     };
 
-    this.cmp_ind_x = function(r) {
+    this.cmp_ind_x = function() {
         this.indirect_x();
         if (this.opCycle === 5) {
-            this.compare(r, oper);
+            this.compare(cmpOper, oper);
             this.reset_cycles();
         }
     };
 
-    this.cmp_ind_y = function(r) {
+    this.cmp_ind_y = function() {
         this.indirect_y();
         if (this.opCycle === 5) {
-            this.compare(r, oper);
+            this.compare(cmpOper, oper);
             this.reset_cycles();
         }
     };
@@ -998,7 +1023,7 @@ const Cpu6502 = function(nes, cpu) {
         }
     };
 
-    this.ora_imm = function() {
+    this.ora_zp_x = function() {
         this.zeropage_i(cpu.x);
         if (this.opCycle === 3) {
             this.logic_or(oper);
@@ -1065,6 +1090,7 @@ const Cpu6502 = function(nes, cpu) {
     this.pla = function() {
         if (this.opCycle === 3) {
             cpu.a = cpu.pop();
+            this.check_zn(cpu.a);
             this.reset_cycles();
         }
     };
@@ -1221,14 +1247,14 @@ const Cpu6502 = function(nes, cpu) {
     this.sbc_imm = function() {
         this.immediate();
 
-        this.add_carry(oper);
+        this.add_carry(oper ^ 0xff);
         this.reset_cycles();
     };
 
     this.sbc_zp = function() {
         this.zeropage();
         if (this.opCycle === 2) {
-            this.add_carry(~oper);
+            this.add_carry(oper ^ 0xff);
             this.reset_cycles();
         }
     };
@@ -1236,7 +1262,7 @@ const Cpu6502 = function(nes, cpu) {
     this.sbc_zp_x = function() {
         this.zeropage_i(cpu.x);
         if (this.opCycle === 3) {
-            this.add_carry(~oper);
+            this.add_carry(oper ^ 0xff);
             this.reset_cycles();
         }
     };
@@ -1244,7 +1270,7 @@ const Cpu6502 = function(nes, cpu) {
     this.sbc_abs = function() {
         this.absolute();
         if (this.opCycle === 3) {
-            this.add_carry(~oper);
+            this.add_carry(oper ^ 0xff);
             this.reset_cycles();
         }
     };
@@ -1252,7 +1278,7 @@ const Cpu6502 = function(nes, cpu) {
     this.sbc_abs_x = function() {
         this.absolute_i(cpu.x);
         if (this.opCycle === 4) {
-            this.add_carry(~oper);
+            this.add_carry(oper ^ 0xff);
             this.reset_cycles();
         }
     };
@@ -1260,7 +1286,7 @@ const Cpu6502 = function(nes, cpu) {
     this.sbc_abs_y = function() {
         this.absolute_i(cpu.y);
         if (this.opCycle === 4) {
-            this.add_carry(~oper);
+            this.add_carry(oper ^ 0xff);
             this.reset_cycles();
         }
     };
@@ -1268,7 +1294,7 @@ const Cpu6502 = function(nes, cpu) {
     this.sbc_ind_x = function() {
         this.indirect_x();
         if (this.opCycle === 5) {
-            this.add_carry(~oper);
+            this.add_carry(oper ^ 0xff);
             this.reset_cycles();
         }
     };
@@ -1276,7 +1302,7 @@ const Cpu6502 = function(nes, cpu) {
     this.sbc_ind_y = function() {
         this.indirect_y();
         if (this.opCycle === 5) {
-            this.add_carry(~oper);
+            this.add_carry(oper ^ 0xff);
             this.reset_cycles();
         }
     };
@@ -1443,9 +1469,7 @@ const Cpu6502 = function(nes, cpu) {
     };
     // ----- TXS
     this.txs = function() {
-        this.check_zn(
-            cpu.sp = cpu.x
-        );
+        cpu.sp = cpu.x
         this.reset_cycles();
     };
 
@@ -1459,43 +1483,87 @@ const Cpu6502 = function(nes, cpu) {
 
     this.decode = function(op) {
         switch(op) {
+            // 0
+            case 0x00: return this.brk;
+            case 0x01: return this.ora_ind_x;
+            case 0x08: return this.php;
+            case 0x09: return this.ora_imm;
+            case 0x0a: return this.asl_a;
             // 1
             case 0x10: return this.bpl;
             case 0x18: return this.clc;
             // 2
             case 0x20: return this.jsr;
             case 0x24: return this.bit_zp;
+            case 0x28: return this.plp;
+            case 0x29: return this.and_imm;
+            case 0x2a: return this.rol_a;
             // 3
+            case 0x30: return this.bmi;
             case 0x38: return this.sec;
+            case 0x3e: return this.rol_abs;
             // 4
+            case 0x40: return this.rti;
+            case 0x48: return this.pha;
+            case 0x49: return this.eor_imm;
+            case 0x4a: return this.lsr_a;
             case 0x4c: return this.jmp_abs;
             // 5
             case 0x50: return this.bvc;
             // 6
-            // case 0x60: return this.rts;
+            case 0x60: return this.rts;
+            case 0x68: return this.pla;
+            case 0x69: return this.adc_imm;
+            case 0x6a: return this.ror_a;
             // 7
             case 0x70: return this.bvs;
+            case 0x78: return this.sei;
             // 8
+            case 0x81: return this.sta_ind_x;
             case 0x85: return this.sta_zp;
             case 0x86: return this.stx_zp;
+            case 0x88: return this.dey;
+            case 0x8a: return this.txa;
+            case 0x8d: return this.sta_abs;
+            case 0x8e: return this.stx_abs;
             // 9
             case 0x90: return this.bcc;
+            case 0x98: return this.tya;
+            case 0x9a: return this.txs;
             // A
+            case 0xa0: return this.ldy_imm;
+            case 0xa1: return this.lda_ind_x;
             case 0xa2: return this.ldx_imm;
+            case 0xa5: return this.lda_zp;
+            case 0xa8: return this.tay;
             case 0xa9: return this.lda_imm;
+            case 0xaa: return this.tax;
+            case 0xad: return this.lda_abs;
+            case 0xae: return this.ldx_abs;
             // B
             case 0xb0: return this.bcs;
+            case 0xb8: return this.clv;
+            case 0xba: return this.tsx;
+            // C
+            case 0xc0: cmpOper = cpu.y; return this.cmp_imm;
+            case 0xc8: return this.iny;
+            case 0xc9: cmpOper = cpu.a; return this.cmp_imm;
+            case 0xca: return this.dex;
             // D
             case 0xd0: return this.bne;
+            case 0xd8: return this.cld;
             // E
+            case 0xe0: cmpOper = cpu.x; return this.cmp_imm;
+            case 0xe8: return this.inx;
+            case 0xe9: return this.sbc_imm;
             case 0xea: return this.nop;
             // F
             case 0xf0: return this.beq;
+            case 0xf8: return this.sed;
 
             default:
                 this.panic(op);
         }
-        return this.adc_imm;
     };
 
     this.execute = function() {
@@ -1525,12 +1593,12 @@ const Cpu6502 = function(nes, cpu) {
             hex16(cpu.pc) + '  '
             + hex8(cpu.read(cpu.pc)) + ' '
             + hex8(cpu.read(cpu.pc + 1)) + ' '
-            + hex8(cpu.read(cpu.pc + 2)) + '    '
+            + hex8(cpu.read(cpu.pc + 2)) + '       '
             // registers
             + ' A:' + hex8(cpu.a)
             + ' X:' + hex8(cpu.x)
             + ' Y:' + hex8(cpu.y)
-            + ' P:' + hex8(cpu.getP())
+            + ' P:' + hex8(cpu.getPFull())
             + ' SP:' + hex8(cpu.sp)
             // end
             + '\n'
@@ -1539,7 +1607,7 @@ const Cpu6502 = function(nes, cpu) {
 
     var log = '';
     this.panic = function(op) {
-        var win = window.open("", "Memdump", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=400,height=400,top="+(screen.height/2)+",left="+(screen.width/2));
+        var win = window.open("", "Log", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=400,height=400,top="+(screen.height/2)+",left="+(screen.width/2));
         win.document.body.innerHTML = '<pre>' + log + '</pre>';
 
         throw `invalid op: ${ ('0' + op.toString(16)).slice(-2)}`;
