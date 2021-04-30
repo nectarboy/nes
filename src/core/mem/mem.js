@@ -5,7 +5,7 @@ const Mem = function(nes) {
 
     // =============== // Memory Blocks //
     this.wram = new Uint8Array(0x0800);
-    this.rom = new Uint8Array(0);
+    this.rom = new Uint8Array(0xffff - 0x3fff);
 
     // IO register access
     this.readIO = function(addr) {
