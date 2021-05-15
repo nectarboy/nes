@@ -200,13 +200,13 @@ const Cpu6502 = function(nes, cpu) {
                 addr |= this.fetch() << 8;
 
                 // Page crossing
-                var sum = (addr + i) & 0xff;
+                var sum = (addr + i) & 0xffff;
                 this.opCycle += (addr & 0x0f00) === (sum & 0x0f00);
 
                 addr = sum;
                 break;
             case 3:
-                // Expend a cycle
+                // Expend a cycle if page crossed
                 break;
             case 4:
                 oper = cpu.read(addr);
@@ -217,16 +217,18 @@ const Cpu6502 = function(nes, cpu) {
     this.indirect = function() {
         switch (this.opCycle) {
             case 1:
-                addr = this.fetch();
+                oper = this.fetch(); // addr lo
                 break;
             case 2:
-                addr |= this.fetch() << 8;
+                oper |= this.fetch() << 8; // addr hi
                 break;
             case 3:
-                // Expend a cycle
+                addr = cpu.read(oper); // lo byte
                 break;
             case 4:
-                addr = cpu.read16(addr);
+                addr |= cpu.read(
+                    (oper++ & 0xff00) | (oper & 0xff) // page boundary stuff !!
+                ) << 8; // hi byte
                 break;
         }
     };
@@ -240,9 +242,11 @@ const Cpu6502 = function(nes, cpu) {
                 oper = (oper + cpu.x) & 0xff;
                 break;
             case 3:
-                addr = cpu.read16(oper);
+                addr = cpu.read(oper++); // lo byte
                 break;
             case 4:
+                addr |= cpu.read(oper & 0xff) << 8; // hi byte
+                
                 oper = cpu.read(addr);
                 break;
         }
@@ -254,16 +258,17 @@ const Cpu6502 = function(nes, cpu) {
                 oper = this.fetch();
                 break;
             case 2:
-                addr = cpu.read16(oper);
+                addr = cpu.read(oper++); // lo byte
                 break;
             case 3:
-                // Page crossing
-                var sum = (addr + cpu.y) & 0xff;
-                this.opCycle += (addr & 0x0f00) === (sum & 0x0f00);
+                addr |= cpu.read(oper & 0xff) << 8; // hi byte
 
+                var sum = (addr + cpu.y) & 0xffff;
+                // Page crossing
+                this.opCycle += (addr & 0x0f00) === (sum & 0x0f00);
                 addr = sum;
             case 4:
-                // Expend a cycle
+                // Expend a cycle if page crossed
                 break;
             case 5:
                 oper = cpu.read(addr);
@@ -887,7 +892,7 @@ const Cpu6502 = function(nes, cpu) {
 
     this.lda_ind_x = function() {
         this.indirect_x();
-        if (this.opCycle === 4) {
+        if (this.opCycle === 5) {
             this.check_zn(cpu.a = oper);
             this.reset_cycles();
         }
@@ -895,7 +900,7 @@ const Cpu6502 = function(nes, cpu) {
 
     this.lda_ind_y = function() {
         this.indirect_y();
-        if (this.opCycle === 4) {
+        if (this.opCycle === 5) {
             this.check_zn(cpu.a = oper);
             this.reset_cycles();
         }
@@ -994,9 +999,6 @@ const Cpu6502 = function(nes, cpu) {
             cpu.write(addr, oper);
         }
         else if (this.opCycle === 4) {
-            if (cpu.pc === 0xd42e)
-                console.log(oper.toString(16), cpu.read(addr));
-
             cpu.write(addr, this.logic_shift_right(oper));
             this.reset_cycles();
         }
@@ -1509,6 +1511,62 @@ const Cpu6502 = function(nes, cpu) {
         this.reset_cycles();
     };
 
+    // =============== // Illegal Instructions //
+    // ----- IGN
+    this.ign_imm = function() {
+        this.immediate();
+        this.reset_cycles();
+    };
+
+    this.ign_zp = function() {
+        this.zeropage();
+        if (this.opCycle === 2) {
+            this.reset_cycles();
+        }
+    };
+
+    this.ign_zp_x = function() {
+        this.zeropage_i(cpu.x);
+        if (this.opCycle === 3) {
+            this.reset_cycles();
+        }
+    };
+
+    this.ign_abs = function() {
+        this.absolute();
+        if (this.opCycle === 3) {
+            this.reset_cycles();
+        }
+    };
+
+    this.ign_abs_x = function() {
+        this.absolute_i(cpu.x);
+        if (this.opCycle === 4) {
+            this.reset_cycles();
+        }
+    };
+
+    this.ign_abs_y = function() {
+        this.absolute_i(cpu.y);
+        if (this.opCycle === 4) {
+            this.reset_cycles();
+        }
+    };
+
+    this.ign_ind_x = function() {
+        this.indirect_x();
+        if (this.opCycle === 5) {
+            this.reset_cycles();
+        }
+    };
+
+    this.ign_ind_y = function() {
+        this.indirect_y();
+        if (this.opCycle === 5) {
+            this.reset_cycles();
+        }
+    };
+
     // =============== // Fetching and Decoding //
     this.fetch = function() {
         var byte = cpu.read(cpu.pc++);
@@ -1522,6 +1580,7 @@ const Cpu6502 = function(nes, cpu) {
             // 0
             case 0x00: return this.brk;
             case 0x01: return this.ora_ind_x;
+            case 0x04: return this.ign_zp;
             case 0x05: return this.ora_zp;
             case 0x06: return this.asl_zp;
             case 0x08: return this.php;
@@ -1549,36 +1608,57 @@ const Cpu6502 = function(nes, cpu) {
             case 0x2a: return this.rol_a;
             case 0x2c: return this.bit_abs;
             case 0x2d: return this.and_abs;
+            case 0x2e: return this.rol_abs;
             // 3
             case 0x30: return this.bmi;
             case 0x31: return this.and_ind_y;
             case 0x35: return this.and_zp_x;
+            case 0x36: return this.rol_zp_x;
             case 0x38: return this.sec;
             case 0x39: return this.and_abs_y;
             case 0x3d: return this.and_abs_x;
-            case 0x3e: return this.rol_abs;
+            case 0x3e: return this.rol_abs_x;
             // 4
             case 0x40: return this.rti;
             case 0x41: return this.eor_ind_x;
             case 0x45: return this.eor_zp;
+            case 0x44: return this.ign_zp;
             case 0x46: return this.lsr_zp;
             case 0x48: return this.pha;
             case 0x49: return this.eor_imm;
             case 0x4a: return this.lsr_a;
             case 0x4c: return this.jmp_abs;
+            case 0x4e: return this.lsr_abs;
+            case 0x4d: return this.eor_abs;
             // 5
             case 0x50: return this.bvc;
+            case 0x51: return this.eor_ind_y;
+            case 0x55: return this.eor_zp_x;
+            case 0x56: return this.lsr_zp_x;
+            case 0x59: return this.eor_abs_y;
+            case 0x5d: return this.eor_abs_x;
+            case 0x5e: return this.lsr_abs_x;
             // 6
             case 0x60: return this.rts;
             case 0x61: return this.adc_ind_x;
             case 0x65: return this.adc_zp;
+            case 0x64: return this.ign_zp;
             case 0x66: return this.ror_zp;
             case 0x68: return this.pla;
             case 0x69: return this.adc_imm;
             case 0x6a: return this.ror_a;
+            case 0x6c: return this.jmp_ind;
+            case 0x6d: return this.adc_abs;
+            case 0x6e: return this.ror_abs;
             // 7
             case 0x70: return this.bvs;
+            case 0x71: return this.adc_ind_y;
+            case 0x75: return this.adc_zp_x;
+            case 0x76: return this.ror_zp_x;
             case 0x78: return this.sei;
+            case 0x79: return this.adc_abs_y;
+            case 0x7d: return this.adc_abs_x;
+            case 0x7e: return this.ror_abs_x;
             // 8
             case 0x81: return this.sta_ind_x;
             case 0x84: return this.sty_zp;
@@ -1591,9 +1671,14 @@ const Cpu6502 = function(nes, cpu) {
             case 0x8e: return this.stx_abs;
             // 9
             case 0x90: return this.bcc;
+            case 0x91: return this.sta_ind_y;
             case 0x94: return this.sty_zp_x;
+            case 0x95: return this.sta_zp_x;
+            case 0x96: return this.stx_zp_y;
             case 0x98: return this.tya;
+            case 0x99: return this.sta_abs_y;
             case 0x9a: return this.txs;
+            case 0x9d: return this.sta_abs_x;
             // A
             case 0xa0: return this.ldy_imm;
             case 0xa1: return this.lda_ind_x;
@@ -1609,10 +1694,16 @@ const Cpu6502 = function(nes, cpu) {
             case 0xae: return this.ldx_abs;
             // B
             case 0xb0: return this.bcs;
+            case 0xb1: return this.lda_ind_y;
             case 0xb4: return this.ldy_zp_x;
+            case 0xb5: return this.lda_zp_x;
+            case 0xb6: return this.ldx_zp_y;
             case 0xb8: return this.clv;
+            case 0xb9: return this.lda_abs_y;
             case 0xba: return this.tsx;
             case 0xbc: return this.ldy_abs_x;
+            case 0xbd: return this.lda_abs_x;
+            case 0xbe: return this.ldx_abs_y;
             // C
             case 0xc0: cmpOper = cpu.y; return this.cmp_imm;
             case 0xc1: cmpOper = cpu.a; return this.cmp_ind_x;
@@ -1622,10 +1713,18 @@ const Cpu6502 = function(nes, cpu) {
             case 0xc8: return this.iny;
             case 0xc9: cmpOper = cpu.a; return this.cmp_imm;
             case 0xca: return this.dex;
+            case 0xcc: cmpOper = cpu.y; return this.cmp_abs;
+            case 0xcd: cmpOper = cpu.a; return this.cmp_abs;
+            case 0xce: return this.dec_abs;
             // D
             case 0xd0: return this.bne;
+            case 0xd1: cmpOper = cpu.a; return this.cmp_ind_y;
+            case 0xd5: cmpOper = cpu.a; return this.cmp_zp_x;
             case 0xd6: return this.dec_zp_x;
             case 0xd8: return this.cld;
+            case 0xd9: cmpOper = cpu.a; return this.cmp_abs_y;
+            case 0xdd: cmpOper = cpu.a; return this.cmp_abs_x;
+            case 0xde: return this.dec_abs_x;
             // E
             case 0xe0: cmpOper = cpu.x; return this.cmp_imm;
             case 0xe1: return this.sbc_ind_x;
@@ -1635,10 +1734,18 @@ const Cpu6502 = function(nes, cpu) {
             case 0xe8: return this.inx;
             case 0xe9: return this.sbc_imm;
             case 0xea: return this.nop;
+            case 0xec: cmpOper = cpu.x; return this.cmp_abs;
+            case 0xed: return this.sbc_abs;
+            case 0xee: return this.inc_abs;
             // F
             case 0xf0: return this.beq;
+            case 0xf1: return this.sbc_ind_y;
+            case 0xf5: return this.sbc_zp_x;
             case 0xf6: return this.inc_zp_x;
             case 0xf8: return this.sed;
+            case 0xf9: return this.sbc_abs_y;
+            case 0xfd: return this.sbc_abs_x;
+            case 0xfe: return this.inc_abs_x;
 
             default:
                 this.panic(op);
@@ -1663,7 +1770,6 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     // =============== // Debugging //
-    var log = '';
     this.getLogLine = function() {
         var hex8 = n => ('0' + n.toString(16)).slice(-2);
         var hex16 = n => ('000' + n.toString(16)).slice(-4);
@@ -1673,7 +1779,7 @@ const Cpu6502 = function(nes, cpu) {
             hex16(cpu.pc) + '  '
             + hex8(cpu.read(cpu.pc)) + ' '
             + hex8(cpu.read(cpu.pc + 1)) + ' '
-            + hex8(cpu.read(cpu.pc + 2)) + '       '
+            + hex8(cpu.read(cpu.pc + 2)) + ' '.repeat(33)
             // registers
             + ' A:' + hex8(cpu.a)
             + ' X:' + hex8(cpu.x)
@@ -1685,9 +1791,10 @@ const Cpu6502 = function(nes, cpu) {
         );
     };
 
+    var log = '';
     this.panic = function(op) {
         // DEBUG LOG
-        var win = window.open("", "Log", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=400,height=400,top="+(screen.height/2)+",left="+(screen.width/2));
+        var win = window.open("", "Log", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=700,height=400,top="+(screen.height/2)+",left="+(screen.width/2));
         win.document.body.innerHTML = '<pre>' + log + '</pre>';
 
         throw `invalid op: ${ ('0' + op.toString(16)).slice(-2)}`;
