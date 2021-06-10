@@ -1045,6 +1045,11 @@ const Cpu6502 = function(nes, cpu) {
         this.reset_cycles();
     };
 
+    this.nop_imm = function() {
+        this.immediate();
+        this.reset_cycles();
+    };
+
     // ----- ORA
     this.ora_imm = function() {
         this.immediate();
@@ -1660,6 +1665,7 @@ const Cpu6502 = function(nes, cpu) {
             case 0x7d: return this.adc_abs_x;
             case 0x7e: return this.ror_abs_x;
             // 8
+            //case 0x80: return this.nop_imm;
             case 0x81: return this.sta_ind_x;
             case 0x84: return this.sty_zp;
             case 0x85: return this.sta_zp;
@@ -1755,7 +1761,7 @@ const Cpu6502 = function(nes, cpu) {
     this.execute = function() {
         // Done with instruction ?..
         if (this.opCycle === -1) {
-            log += this.getLogLine(); // DEBUG LOG
+            //log += this.getLogLine(); // DEBUG LOG
 
             this.currIns = this.decode(
                 this.currOp = this.fetch()
@@ -1791,14 +1797,20 @@ const Cpu6502 = function(nes, cpu) {
         );
     };
 
-    var log = '';
+    //var log = '';
     this.panic = function(op) {
         // DEBUG LOG
-        var win = window.open("", "Log", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=700,height=400,top="+(screen.height/2)+",left="+(screen.width/2));
-        win.document.body.innerHTML = '<pre>' + log + '</pre>';
+        //var win = window.open("", "Log", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=700,height=400,top="+(screen.height/2)+",left="+(screen.width/2));
+        //win.document.body.innerHTML = '<pre>' + log + '</pre>';
 
         throw `invalid op: ${ ('0' + op.toString(16)).slice(-2)}`;
     };
+
+    // =============== // Reset Function //
+    this.reset = function() {
+        this.reset_cycles();
+    };
+    
 };
 
 export default Cpu6502;

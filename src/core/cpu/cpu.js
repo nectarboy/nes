@@ -7,6 +7,8 @@ const Cpu = function(nes) {
     this.pc = 0x0000;
     this.sp = 0x0000;
 
+    this.shouldNmi = false;
+
     // P reg
     this.p_n = false;
     this.p_v = false;
@@ -121,9 +123,12 @@ const Cpu = function(nes) {
 
     // =============== // Execution //
     this.cpu6502 = new Cpu6502(nes, this);
-    this.stepCpu = function() {
+    this.stepNES = function(cycles) {
         this.cpu6502.execute();
-        this.cycles ++;
+
+        nes.ppu.execute();
+        nes.ppu.execute();
+        nes.ppu.execute();
     };
 
     // =============== // Loop //
@@ -149,20 +154,26 @@ const Cpu = function(nes) {
 
     this.stepFrame = function() {
         for (var i = 0; i < this.cyclesPerFrame; i++)
-            this.stepCpu();
+            this.stepNES(i);
     };
 
     // =============== // Bootstrapping //
     this.reset = function() {
         // Reset internal regs
         this.sp = 0xfd;
-        this.pc = 0xc000;
+        this.pc = cpu.read16(0xfffc);
         this.writeP(0x24);
         this.a = this.x = this.y = 0;
 
+        this.shouldNmi = false;
+
         // Reset cycles
         this.cpu6502.reset_cycles();
+
+        // Reset 6502
+        this.cpu6502.reset();
     };
+    
 };
 
 export default Cpu;

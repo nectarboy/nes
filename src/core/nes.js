@@ -1,19 +1,21 @@
 import constants from './constants.js';
 import Cpu from './cpu/cpu.js';
+import Ppu from './ppu/ppu.js';
 import Mem from './mem/mem.js';
 
 const NES = function() {
     var nes = this;
 
     // =============== // Components //
-    this.cpu = new Cpu(this);
     this.mem = new Mem(this);
+    this.cpu = new Cpu(this);
+    this.ppu = new Ppu(this);
 
     // =============== // Settings //
     this.fps = 60;
     this.setFPS = function(fps) {
         this.fps = fps;
-        this.cpu.cyclesPerFrame = this.cpu.cyclesPerSec / fps;
+        this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec/**constants.ppuclocks_per_cpuclocks*/) / fps;
         this.cpu.interval = 1000 / fps;
     };
 
@@ -27,7 +29,7 @@ const NES = function() {
     this.canvas = null;
     this.attachCanvas = function(canvas) {
         this.canvas = canvas;
-        // this.ppu.ctx = canvas.getContext('2d');
+        this.ppu.rendering.initCtx(canvas);
     };
 
     // Default settings
@@ -52,8 +54,11 @@ const NES = function() {
         this.cpu.stopLoop();
     };
 
+    // Reset Function
     this.reset = function() {
         this.cpu.reset();
+        this.ppu.reset();
+        this.mem.reset();
     };
 
     this.loadRomBuff = function(rom) {
@@ -64,6 +69,7 @@ const NES = function() {
     this.getMaxFps = function() {
         return 1000 / (this.cpu.postMs - this.cpu.preMs);
     };
+    
 };
 
 export default NES;
