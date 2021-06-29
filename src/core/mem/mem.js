@@ -8,10 +8,10 @@ const Mem = function(nes) {
 
     // video
     this.nametable = [
-        new Uint8Array(0x800), // A
-        new Uint8Array(0x800), // B
-        new Uint8Array(0x800), // C
-        new Uint8Array(0x800)  // D
+        new Uint8Array(32 * 32), // A
+        new Uint8Array(32 * 32), // B
+        new Uint8Array(32 * 32), // C
+        new Uint8Array(32 * 32)  // D
     ];
 
     this.nametable0map = 0;
@@ -39,10 +39,10 @@ const Mem = function(nes) {
     };
 
     // CPU to PPU register access
+    this.ppuAddrInc = 0;
+
     this.ppuCtr = 0;
-    this.ppuAddr = 0;
     this.ppuAddrShift = 8;
-    this.ppuData = 0;
 
     this.CPUreadPPU = function(addr) {
         addr &= 7;
@@ -51,29 +51,39 @@ const Mem = function(nes) {
                 return 0; // OPENBUS
                 break;
             case 1: // PPUMASK
+                return 0; // OPENBUS
                 break;
             case 2: // PPUSTATUS
                 var byte = (
-                    // lsb of ppu data whatever the hell
+                    // ...
                     (nes.ppu.sprite0Atm << 6)
-                    | (nes.ppu.vblankAtm << 7)
+                    | (nes.ppu.vblankFlag << 7)
                 );
 
-                nes.ppu.vblankAtm = false;
+                nes.ppu.vblankFlag = false;
                 return byte;
                 break;
             case 3: // OAMADDR_LO
+                return 0; // OPENBUS
                 break;
             case 4: // OAMDATA
+                return 0; // todo :3
                 break;
             case 5: // PPUSCROLL
+                return 0; // OPENBUS
                 break;
             case 6: // PPUADDR
                 return 0; // OPENBUS
                 break;
             case 7: // PPUDATA
-                return this.ppuData;
+                var ret = nes.ppu.readFromCPU(nes.ppu.ppuAddr & 0x3fff);
+                nes.ppu.ppuAddr += this.ppuAddrInc;
+                nes.ppu.ppuAddr &= 0xffff;
+
+                return ret;
                 break;
+
+            default: throw `??? out of bounds CPU2PPU read ${addr.toString(16)}`;
         }
     };
 
@@ -84,14 +94,24 @@ const Mem = function(nes) {
                 this.ppuCtr = val;
 
                 nes.ppu.baseNametableAddr = 0x2000 | (0x4000 * (val & 3));
-                nes.ppu.vramAddrInc = ((val & 0x04) >> 2) ? 32 : 1;
-                nes.ppu.spriteTable = ((val & 0x08) >> 3) ? 0x1000 : 0;
-                nes.ppu.bgTable = ((val & 0x10) >> 4) ? 0x1000 : 0;
-                nes.ppu.spriteSize = ((val & 0x20) >> 5) ? 16 : 8;
+                this.ppuAddrInc = ((val & 0x04) !== 0) ? 16 : 1;
+                nes.ppu.spriteTable = ((val & 0x08) !== 0) ? 0x1000 : 0;
+                nes.ppu.bgTable = ((val & 0x10) !== 0) ? 0x1000 : 0;
+                nes.ppu.spriteSize = ((val & 0x20) !== 0) ? 16 : 8;
                 nes.ppu.masterSelect = (val & 0x40) !== 0;
                 nes.ppu.nmiEnabled = (val & 0x80) !== 0;
                 break;
             case 1: // PPUMASK
+                var enabledBefore = nes.ppu.enabled;
+                nes.ppu.enabled = (val & 0b11000) !== 0;
+
+                if (nes.ppu.enabled !== enabledBefore) nes.ppu.cycles = 0; // MIGHT BE WRONG ??
+
+                nes.ppu.greyscale = (val & 0x01) !== 0;
+                nes.ppu.showBgLeft = (val & 0x02) !== 0;
+                nes.ppu.showSpritesLeft = (val & 0x04) !== 0;
+                nes.ppu.bgEnabled = (val & 0x08) !== 0;
+                nes.ppu.spritesEnabled = (val & 0x10) !== 0;
                 break;
             case 2: // PPUSTATUS
                 break;
@@ -102,14 +122,18 @@ const Mem = function(nes) {
             case 5: // PPUSCROLL
                 break;
             case 6: // PPUADDR
-                this.ppuAddr &= ~(0xff << this.ppuAddrShift);
-                this.ppuAddr |= (val << this.ppuAddrShift);
+                nes.ppu.ppuAddr &= ~(0xff << this.ppuAddrShift);
+                nes.ppu.ppuAddr |= (val << this.ppuAddrShift);
 
                 this.ppuAddrShift ^= 8;
                 break;
             case 7: // PPUDATA
-                this.ppuData = val;
+                nes.ppu.write(nes.ppu.ppuAddr & 0x3fff, val);
+                nes.ppu.ppuAddr += this.ppuAddrInc;
+                nes.ppu.ppuAddr &= 0xffff;
                 break;
+
+            default: throw `??? out of bounds CPU2PPU write ${addr.toString(16)} ${val.toString(16)}`;
         }
     };
 
@@ -205,7 +229,7 @@ const Mem = function(nes) {
 
         // reset properties
         this.ppuCtr = 0;
-        this.ppuAddr = 0;
+        nes.ppu.ppuAddr = 0;
         this.ppuAddrShift = 8;
         this.ppuData = 0;
     };

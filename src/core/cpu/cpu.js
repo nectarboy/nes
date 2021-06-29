@@ -7,7 +7,8 @@ const Cpu = function(nes) {
     this.pc = 0x0000;
     this.sp = 0x0000;
 
-    this.shouldNmi = false;
+    this.shouldNMI = false;
+    this.inNMI = false;
 
     // P reg
     this.p_n = false;
@@ -64,7 +65,7 @@ const Cpu = function(nes) {
         }
         // PPU regs + mirrors
         else if (addr < 0x4000) {
-            return 0; // TODO
+            return nes.mem.CPUreadPPU(addr);
         }
         // IO regs
         else if (addr < 0x4018) {
@@ -87,7 +88,7 @@ const Cpu = function(nes) {
         }
         // PPU regs + mirrors
         else if (addr < 0x4000) {
-            // TODO
+            nes.mem.CPUwritePPU(addr, val);
         }
         // IO regs
         else if (addr < 0x4018) {
@@ -121,14 +122,51 @@ const Cpu = function(nes) {
         return val;
     };
 
+    // =============== // Interrupts //
+    this.intCycle = 0;
+    this.interruptVector = 0;
+
+    this.intAtm = false;
+    this.interrupt = function() {
+        switch (this.opCycle) {
+            case 1:
+                cpu.pc++;
+                cpu.pc &= 0xffff;
+
+                cpu.p_b = true;
+                break;
+            case 2:
+                cpu.push(cpu.pc >> 8);
+                break;
+            case 3:
+                cpu.push(cpu.pc & 0xff);
+                break;
+            case 4:
+                cpu.push(cpu.getP());
+                break;
+            case 5:
+                // Expend cycle
+                break;
+            case 6:
+                cpu.pc = cpu.read16(0xfffe);
+                this.reset_cycles();
+                break;
+        }
+    };
+
     // =============== // Execution //
     this.cpu6502 = new Cpu6502(nes, this);
     this.stepNES = function(cycles) {
         this.cpu6502.execute();
 
         nes.ppu.execute();
-        nes.ppu.execute();
-        nes.ppu.execute();
+        // nes.ppu.execute(); // (3x for loop)
+        // nes.ppu.execute();
+    };
+
+    this.stepFrame = function() {
+        for (var i = 0; i < this.cyclesPerFrame; i++)
+            this.stepNES(i);
     };
 
     // =============== // Loop //
@@ -152,11 +190,6 @@ const Cpu = function(nes) {
         clearTimeout(this.timeout);
     };
 
-    this.stepFrame = function() {
-        for (var i = 0; i < this.cyclesPerFrame; i++)
-            this.stepNES(i);
-    };
-
     // =============== // Bootstrapping //
     this.reset = function() {
         // Reset internal regs
@@ -165,7 +198,8 @@ const Cpu = function(nes) {
         this.writeP(0x24);
         this.a = this.x = this.y = 0;
 
-        this.shouldNmi = false;
+        this.shouldNMI = false;
+        this.inNMI = false;
 
         // Reset cycles
         this.cpu6502.reset_cycles();

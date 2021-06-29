@@ -1762,16 +1762,21 @@ const Cpu6502 = function(nes, cpu) {
         // Done with instruction ?..
         if (this.opCycle === -1) {
             //log += this.getLogLine(); // DEBUG LOG
+            //if (++logC > 8991) this.panic(0);
 
             this.currIns = this.decode(
                 this.currOp = this.fetch()
             );
             this.opCycle++;
+
+            return false;
         }
         // .. Else continue executing instruction
         else {
             this.opCycle++;
             this.currIns(this.currOp);
+
+            return this.opCycle === -1; // Did we finish an instruction rn ??
         }
     };
 
@@ -1798,6 +1803,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     //var log = '';
+    //var logC = 0;
     this.panic = function(op) {
         // DEBUG LOG
         //var win = window.open("", "Log", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=700,height=400,top="+(screen.height/2)+",left="+(screen.width/2));

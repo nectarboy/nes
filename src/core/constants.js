@@ -7,6 +7,8 @@ const constants = {
     clocks_pal: 0, // ???
     ppuclocks_per_cpuclocks: 3,
 
+    ppu_cyclesperframe: 89342,
+
     // iNES
     ines_headersize: 16,
 
