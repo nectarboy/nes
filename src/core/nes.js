@@ -15,7 +15,7 @@ const NES = function() {
     this.fps = 60;
     this.setFPS = function(fps) {
         this.fps = fps;
-        this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec/**constants.ppuclocks_per_cpuclocks*/) / fps;
+        this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / fps;
         this.cpu.interval = 1000 / fps;
     };
 

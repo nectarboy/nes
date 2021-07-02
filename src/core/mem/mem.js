@@ -42,7 +42,7 @@ const Mem = function(nes) {
     this.ppuAddrInc = 0;
 
     this.ppuCtr = 0;
-    this.ppuAddrShift = 8;
+    this.ppuLatch = false;
 
     this.CPUreadPPU = function(addr) {
         addr &= 7;
@@ -54,6 +54,7 @@ const Mem = function(nes) {
                 return 0; // OPENBUS
                 break;
             case 2: // PPUSTATUS
+
                 var byte = (
                     // ...
                     (nes.ppu.sprite0Atm << 6)
@@ -61,6 +62,8 @@ const Mem = function(nes) {
                 );
 
                 nes.ppu.vblankFlag = false;
+                this.ppuLatch = false; // Reset
+
                 return byte;
                 break;
             case 3: // OAMADDR_LO
@@ -105,7 +108,7 @@ const Mem = function(nes) {
                 var enabledBefore = nes.ppu.enabled;
                 nes.ppu.enabled = (val & 0b11000) !== 0;
 
-                if (nes.ppu.enabled !== enabledBefore) nes.ppu.cycles = 0; // MIGHT BE WRONG ??
+                if (nes.ppu.enabled && !enabledBefore) nes.ppu.newFrame();
 
                 nes.ppu.greyscale = (val & 0x01) !== 0;
                 nes.ppu.showBgLeft = (val & 0x02) !== 0;
@@ -120,12 +123,23 @@ const Mem = function(nes) {
             case 4: // OAMDATA
                 break;
             case 5: // PPUSCROLL
+                if (this.ppuLatch) {
+                    nes.ppu.fineY = val & 0b111;
+                    nes.ppu.coarseY = val >> 3;
+                }
+                else {
+                    nes.ppu.fineX = val & 0b111;
+                    nes.ppu.coarseX = val >> 3;
+                }
+
+                this.ppuLatch = !this.ppuLatch;
                 break;
             case 6: // PPUADDR
-                nes.ppu.ppuAddr &= ~(0xff << this.ppuAddrShift);
-                nes.ppu.ppuAddr |= (val << this.ppuAddrShift);
+                var shift = this.ppuLatch ? 0 : 8;
+                nes.ppu.ppuAddr &= ~(0xff << shift);
+                nes.ppu.ppuAddr |= (val << shift);
 
-                this.ppuAddrShift ^= 8;
+                this.ppuLatch = !this.ppuLatch;
                 break;
             case 7: // PPUDATA
                 nes.ppu.write(nes.ppu.ppuAddr & 0x3fff, val);
@@ -230,7 +244,7 @@ const Mem = function(nes) {
         // reset properties
         this.ppuCtr = 0;
         nes.ppu.ppuAddr = 0;
-        this.ppuAddrShift = 8;
+        this.ppuLatch = false; // Reset flip-flop
         this.ppuData = 0;
     };
 

@@ -5,9 +5,8 @@ const constants = {
     // NES clocks
     clocks_ntsc: 21441960,
     clocks_pal: 0, // ???
-    ppuclocks_per_cpuclocks: 3,
 
-    ppu_cyclesperframe: 89342,
+    ppu_cyclespervblank: 19 * 341,
 
     // iNES
     ines_headersize: 16,

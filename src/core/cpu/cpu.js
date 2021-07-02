@@ -160,8 +160,6 @@ const Cpu = function(nes) {
         this.cpu6502.execute();
 
         nes.ppu.execute();
-        // nes.ppu.execute(); // (3x for loop)
-        // nes.ppu.execute();
     };
 
     this.stepFrame = function() {
