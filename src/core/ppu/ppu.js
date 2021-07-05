@@ -169,8 +169,11 @@ const Ppu = function(nes) {
 
             // Vblank scanlines ...
             else {
-                if (!this.vblankFlag) // Set vblank flag !
+                if (!this.vblankFlag) // Set vblank flag + NMI !
                     this.vblankFlag = true;
+
+                nes.cpu.shouldInterrupt = this.nmiEnabled;
+                nes.cpu.intVec = 0xfffa;
 
                 // End of frame ...
                 if (pre_cycles === 340) {
@@ -194,6 +197,7 @@ const Ppu = function(nes) {
     this.newFrame = function() {
         this.vblankAtm = false;
         this.vblankFlag = false;
+        nes.cpu.shouldInterrupt = false;
 
         this.ppuAddr = this.baseNametableAddr;
 

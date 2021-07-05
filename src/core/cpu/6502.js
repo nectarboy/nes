@@ -1805,9 +1805,7 @@ const Cpu6502 = function(nes, cpu) {
     //var log = '';
     //var logC = 0;
     this.panic = function(op) {
-        // DEBUG LOG
-        //var win = window.open("", "Log", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=700,height=400,top="+(screen.height/2)+",left="+(screen.width/2));
-        //win.document.body.innerHTML = '<pre>' + log + '</pre>';
+        //nes.popupString(log);
 
         throw `invalid op: ${ ('0' + op.toString(16)).slice(-2)}`;
     };

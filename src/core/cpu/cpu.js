@@ -56,7 +56,6 @@ const Cpu = function(nes) {
 
     // =============== // Reading and Writing //
     this.hasRom = false;
-    this.testMode = false;
 
     this.read = function(addr) {
         // WRAM + mirrors
@@ -124,32 +123,38 @@ const Cpu = function(nes) {
 
     // =============== // Interrupts //
     this.intCycle = 0;
-    this.interruptVector = 0;
+    this.intVec = 0;
+    this.interrupting = false;
+    this.shouldInterrupt = false;
 
-    this.intAtm = false;
     this.interrupt = function() {
-        switch (this.opCycle) {
+        this.intCycle++;
+        switch (this.intCycle) {
             case 1:
-                cpu.pc++;
-                cpu.pc &= 0xffff;
+                this.pc++;
+                this.pc &= 0xffff;
 
-                cpu.p_b = true;
+                this.p_b = true;
                 break;
             case 2:
-                cpu.push(cpu.pc >> 8);
+                this.push(this.pc >> 8);
                 break;
             case 3:
-                cpu.push(cpu.pc & 0xff);
+                this.push(this.pc & 0xff);
                 break;
             case 4:
-                cpu.push(cpu.getP());
+                this.push(this.getP());
                 break;
             case 5:
                 // Expend cycle
+                this.pc = 0;
+                this.pc |= this.read(this.intVec);
                 break;
             case 6:
-                cpu.pc = cpu.read16(0xfffe);
-                this.reset_cycles();
+                this.pc |= this.read(this.intVec + 1) << 8;
+                this.intCycle = 0;
+                this.interrupting = false;
+                this.shouldInterrupt = false;
                 break;
         }
     };
@@ -157,7 +162,10 @@ const Cpu = function(nes) {
     // =============== // Execution //
     this.cpu6502 = new Cpu6502(nes, this);
     this.stepNES = function(cycles) {
-        this.cpu6502.execute();
+        if (this.interrupting)
+            this.interrupt();
+        else
+            this.interrupting = this.cpu6502.execute() && this.shouldInterrupt;
 
         nes.ppu.execute();
     };
@@ -196,8 +204,10 @@ const Cpu = function(nes) {
         this.writeP(0x24);
         this.a = this.x = this.y = 0;
 
-        this.shouldNMI = false;
-        this.inNMI = false;
+        this.interrupting = false;
+        this.shouldInterrupt = false;
+        this.intVec = 0;
+        this.intCycle = 0;
 
         // Reset cycles
         this.cpu6502.reset_cycles();

@@ -69,6 +69,11 @@ const NES = function() {
     this.getMaxFps = function() {
         return 1000 / (this.cpu.postMs - this.cpu.preMs);
     };
+
+    this.popupString = function(str) {
+        var win = window.open("", "Log", "toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes,width=700,height=400,top="+(screen.height/2)+",left="+(screen.width/2));
+        win.document.body.innerHTML = '<pre>' + str + '</pre>';
+    };
     
 };
 
