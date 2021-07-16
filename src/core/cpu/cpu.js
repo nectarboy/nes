@@ -109,22 +109,22 @@ const Cpu = function(nes) {
 
     // Stack
     this.push = function(val) {
-        this.write(0x100 | this.sp--, val);
+        this.write(0x100 | this.sp, val);
+        this.sp--;
         this.sp &= 0xff;
     };
 
     this.pop = function() {
         this.sp++;
         this.sp &= 0xff;
-        var val = this.read(0x100 | this.sp, val);
-
-        return val;
+        return this.read(0x100 | this.sp);
     };
 
     // =============== // Interrupts //
     this.intCycle = 0;
     this.intVec = 0;
     this.interrupting = false;
+    this.inNMI = false;
     this.shouldInterrupt = false;
 
     this.interrupt = function() {
@@ -133,8 +133,6 @@ const Cpu = function(nes) {
             case 1:
                 this.pc++;
                 this.pc &= 0xffff;
-
-                this.p_b = true;
                 break;
             case 2:
                 this.push(this.pc >> 8);
@@ -146,12 +144,11 @@ const Cpu = function(nes) {
                 this.push(this.getP());
                 break;
             case 5:
-                // Expend cycle
-                this.pc = 0;
-                this.pc |= this.read(this.intVec);
+                this.pc = this.read(this.intVec);
                 break;
             case 6:
                 this.pc |= this.read(this.intVec + 1) << 8;
+
                 this.intCycle = 0;
                 this.interrupting = false;
                 this.shouldInterrupt = false;
@@ -159,13 +156,33 @@ const Cpu = function(nes) {
         }
     };
 
+    // Interrupt generation
+    this.generateNMI = function() {
+        if (this.interrupting)
+            return;
+
+        this.shouldInterrupt = true;
+        this.inNMI = true;
+        this.intVec = 0xfffa;
+    };
+
     // =============== // Execution //
     this.cpu6502 = new Cpu6502(nes, this);
     this.stepNES = function(cycles) {
-        if (this.interrupting)
+        if (this.interrupting) {
             this.interrupt();
-        else
-            this.interrupting = this.cpu6502.execute() && this.shouldInterrupt;
+        }
+        else {
+            // Check for interrupts
+            if (this.cpu6502.execute() && this.shouldInterrupt) {
+                this.interrupting = true;
+                // Clear NMI bit if its an NMI !
+                if (this.inNMI) {
+                    this.inNMI = false;
+                    nes.ppu.nmiEnabled = false;
+                }
+            }
+        }
 
         nes.ppu.execute();
     };
@@ -204,10 +221,11 @@ const Cpu = function(nes) {
         this.writeP(0x24);
         this.a = this.x = this.y = 0;
 
-        this.interrupting = false;
-        this.shouldInterrupt = false;
-        this.intVec = 0;
         this.intCycle = 0;
+        this.intVec = 0;
+        this.interrupting = false;
+        this.inNMI = false;
+        this.shouldInterrupt = false;
 
         // Reset cycles
         this.cpu6502.reset_cycles();

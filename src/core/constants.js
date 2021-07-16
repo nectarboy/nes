@@ -3,7 +3,7 @@ const constants = {
     screen_height: 240,
 
     // NES clocks
-    clocks_ntsc: 21441960,
+    clocks_ntsc: 1786840,
     clocks_pal: 0, // ???
 
     ppu_cyclespervblank: 19 * 341,

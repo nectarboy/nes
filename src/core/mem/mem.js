@@ -39,10 +39,8 @@ const Mem = function(nes) {
     };
 
     // CPU to PPU register access
-    this.ppuAddrInc = 0;
-
-    this.ppuCtr = 0;
     this.ppuLatch = false;
+    this.ppuAddrInc = 0;
 
     this.CPUreadPPU = function(addr) {
         addr &= 7;
@@ -56,6 +54,7 @@ const Mem = function(nes) {
                 break;
             }
             case 2: { // PPUSTATUS
+                nes.log += `CPU :: READ PPUSTAT, vblankFlag: ${nes.ppu.vblankFlag} --> false\n`;
 
                 var byte = (
                     // ...
@@ -64,7 +63,7 @@ const Mem = function(nes) {
                 );
 
                 nes.ppu.vblankFlag = false;
-                this.ppuLatch = false; // Reset
+                this.ppuLatch = false; // Reset latch
 
                 return byte;
                 break;
@@ -86,11 +85,12 @@ const Mem = function(nes) {
                 break;
             }
             case 7: { // PPUDATA
-                var ret = nes.ppu.readFromCPU(nes.ppu.ppuAddr & 0x3fff);
+                var byte = nes.ppu.readFromCPU(nes.ppu.ppuAddr & 0x3fff);
+
                 nes.ppu.ppuAddr += this.ppuAddrInc;
                 nes.ppu.ppuAddr &= 0xffff;
 
-                return ret;
+                return byte;
                 break;
             }
 
@@ -102,8 +102,6 @@ const Mem = function(nes) {
         addr &= 7;
         switch (addr) {
             case 0: { // PPUCTR
-                this.ppuCtr = val;
-
                 nes.ppu.baseNametableAddr = 0x2000 | (0x4000 * (val & 3));
                 this.ppuAddrInc = ((val & 0x04) !== 0) ? 32 : 1;
                 nes.ppu.spriteTable = ((val & 0x08) !== 0) ? 0x1000 : 0;
@@ -111,6 +109,8 @@ const Mem = function(nes) {
                 nes.ppu.spriteSize = ((val & 0x20) !== 0) ? 16 : 8;
                 nes.ppu.masterSelect = (val & 0x40) !== 0;
                 nes.ppu.nmiEnabled = (val & 0x80) !== 0;
+
+                nes.log += `CPU :: WRITE PPUCTR, ${val.toString(16)}\n`;
                 break;
             }
             case 1: { // PPUMASK
@@ -149,6 +149,8 @@ const Mem = function(nes) {
                 break;
             }
             case 6: { // PPUADDR
+                var before = nes.ppu.ppuAddr;
+
                 var shift = this.ppuLatch ? 0 : 8;
                 nes.ppu.ppuAddr &= ~(0xff << shift);
                 nes.ppu.ppuAddr |= (val << shift);
@@ -157,17 +159,14 @@ const Mem = function(nes) {
                 break;
             }
             case 7: { // PPUDATA
-                this.log += `addr: ${nes.ppu.ppuAddr.toString(16)} val: ${val.toString(16)}\n`;
-
                 nes.ppu.write(nes.ppu.ppuAddr & 0x3fff, val);
+
                 nes.ppu.ppuAddr += this.ppuAddrInc;
                 nes.ppu.ppuAddr &= 0xffff;
                 break;
             }
         }
     };
-
-    this.log = '';
 
     // Cartridge memory access
     this.readCart = function(addr) {
@@ -255,7 +254,6 @@ const Mem = function(nes) {
             this.CPUwritePPU(i, 0);
 
         // reset properties
-        this.ppuCtr = 0;
         nes.ppu.ppuAddr = 0;
         this.ppuLatch = false; // Reset flip-flop
         this.ppuData = 0;

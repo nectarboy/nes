@@ -112,7 +112,6 @@ const Ppu = function(nes) {
     this.coarseY = 0;
 
     this.ly = 0;
-    this.lx = 0;
 
     this.currPattern = [0,0]; // hi - lo
     this.nextPattern = [0,0]; // hi - lo
@@ -123,30 +122,38 @@ const Ppu = function(nes) {
     this.oddFrame = 0;
 
     // =============== // Execution //
-    this.execute = function() {
-        // When disabled --
+    var csVblank = 0;
+    var csRender = 0;
+    var csPostRender = 0;
 
-        // When enabled --
+    this.execute = function() {
         for (var i = 0; i < 3; i++) {
         // -------------------------------- //
 
-        var pre_cycles = this.cycles;
-        this.cycles++;
+        csVblank++;
+        csRender++;
+        csPostRender++;
 
         if (this.mode === 0) {
             // Rendering scanlines
 
-            var preRender = this.ly === 261;
+            var preRender = (this.ly === 261);
 
             // End of scanline ...
-            if (pre_cycles === 340) {
+            if (this.cycles === 341) {
                 this.cycles = 0;
-                this.ly++;
+
+                nes.log += `cycles since render ${csRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
+                csRender = 0;
 
                 if (preRender) // End of pre-rendering !
                     this.ly = 0;
-                else if (this.ly === 241) // End of rendering !
+                else if (this.ly === 239) // End of rendering !
                     this.mode = 1;
+                else
+                    this.ly++;
+
+                return;
             }
 
         }
@@ -157,49 +164,61 @@ const Ppu = function(nes) {
             if (!this.vblankAtm) {
 
                 // End of idle scanline ...
-                if (pre_cycles === 340) {
+                if (this.cycles === 341) {
                     this.cycles = 0;
                     this.ly++;
 
                     this.vblankAtm = true;
+                    this.vblankFlag = true;
+
+                    nes.log += `cycles since vblank ${csVblank} i: ${nes.cpu.interrupting}\n`;
+                    csVblank = 0;
 
                     this.debugDrawNT(0);
+                    return;
                 }
+
             }
 
             // Vblank scanlines ...
             else {
-                if (!this.vblankFlag) // Set vblank flag + NMI !
-                    this.vblankFlag = true;
 
-                nes.cpu.shouldInterrupt = this.nmiEnabled;
-                nes.cpu.intVec = 0xfffa;
+                // Vblank NMIs !
+                if (this.vblankFlag && this.nmiEnabled) {
+                    nes.cpu.generateNMI();
+                    nes.log += `  NMI GENERATED !! i: ${nes.cpu.interrupting}\n`;
+                }
 
-                // End of frame ...
-                if (pre_cycles === 340) {
-                    this.cycles = 0;
-                    this.ly++;
+                // End of vblank scanline ...
+                if (this.cycles === 341) {
+                    nes.log += `cycles since POST ${csPostRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
+                    csPostRender = 0;
 
-                    if (this.ly === 261) {// End of frame !
+                    if (this.ly === 260) // End of frame !!!
                         this.newFrame();
+                    else {
+                        this.cycles = 0;
+                        this.ly++;
                     }
+
+                    return;
                 }
             }
 
         }
 
+        // All done ~
+        this.cycles++;
+
         // -------------------------------- //
         }
 
-        // All done ~
     };
 
+    // TODO - make more accurate !!!
     this.newFrame = function() {
         this.vblankAtm = false;
         this.vblankFlag = false;
-        nes.cpu.shouldInterrupt = false;
-
-        this.ppuAddr = this.baseNametableAddr;
 
         this.cycles = 0;
 
@@ -207,6 +226,28 @@ const Ppu = function(nes) {
         this.mode = 0; // Back to rendering !
     };
 
+    // =============== // Reset Function //
+    this.reset = function() {
+        // Reset registers
+        this.sprite0Atm = false;
+        this.vblankAtm = false;
+        this.vblankFlag = false;
+
+        this.fineX = 0;
+        this.coarseX = 0;
+        this.fineY = 0;
+        this.coarseY = 0;
+
+        // Reset internal stuff
+        this.enabled = false;
+
+        this.currPattern[0] = this.currPattern[1] = 0;
+        this.nextPattern[0] = this.nextPattern[1] = 0;
+
+        this.newFrame();
+    };
+
+    // =============== // Debug Functions //
     this.debugDrawChr = function() {
         for (var i = 0; i < mem.chr.length; i += 16) {
 
@@ -238,8 +279,8 @@ const Ppu = function(nes) {
 
                 // -------------------------------- //
                 for (var y = 0; y < 8; y++) {
-                    var hi = mem.chr[ind + y + 8];
-                    var lo = mem.chr[ind + y];
+                    var hi = this.read(this.bgTable + ind + y + 8);
+                    var lo = this.read(this.bgTable + ind + y);
 
                     for (var x = 0; x < 8; x++) {
                         var pxData = (((hi >> (x^7)) & 1) << 1) | ((lo >> (x^7)) & 1);
@@ -253,33 +294,6 @@ const Ppu = function(nes) {
         }
 
         this.rendering.renderImg();
-    };
-
-    // =============== // Reset Function //
-    this.reset = function() {
-        // Reset registers
-        this.sprite0Atm = false;
-        this.vblankAtm = false;
-        this.vblankFlag = false;
-
-        this.fineX = 0;
-        this.coarseX = 0;
-        this.fineY = 0;
-        this.coarseY = 0;
-
-        // Reset internal stuff
-        this.enabled = false;
-        this.ly = 261;
-        this.lx = 0;
-
-        this.currPattern[0] = this.currPattern[1] = 0;
-        this.nextPattern[0] = this.nextPattern[1] = 0;
-
-        this.mode = 0;
-        this.cycles = 0;
-        this.oddFrame = 0;
-
-        this.newFrame();
     };
 
 };
