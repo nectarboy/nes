@@ -54,8 +54,6 @@ const Mem = function(nes) {
                 break;
             }
             case 2: { // PPUSTATUS
-                nes.log += `CPU :: READ PPUSTAT, vblankFlag: ${nes.ppu.vblankFlag} --> false\n`;
-
                 var byte = (
                     // ...
                     (nes.ppu.sprite0Atm << 6)
@@ -109,15 +107,10 @@ const Mem = function(nes) {
                 nes.ppu.spriteSize = ((val & 0x20) !== 0) ? 16 : 8;
                 nes.ppu.masterSelect = (val & 0x40) !== 0;
                 nes.ppu.nmiEnabled = (val & 0x80) !== 0;
-
-                nes.log += `CPU :: WRITE PPUCTR, ${val.toString(16)}\n`;
                 break;
             }
             case 1: { // PPUMASK
-                var enabledBefore = nes.ppu.enabled;
                 nes.ppu.enabled = (val & 0b11000) !== 0;
-
-                if (nes.ppu.enabled && !enabledBefore) nes.ppu.newFrame();
 
                 nes.ppu.greyscale = (val & 0x01) !== 0;
                 nes.ppu.showBgLeft = (val & 0x02) !== 0;

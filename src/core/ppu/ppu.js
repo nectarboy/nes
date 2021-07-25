@@ -130,9 +130,9 @@ const Ppu = function(nes) {
         for (var i = 0; i < 3; i++) {
         // -------------------------------- //
 
-        csVblank++;
-        csRender++;
-        csPostRender++;
+        // csVblank++;
+        // csRender++;
+        // csPostRender++;
 
         if (this.mode === 0) {
             // Rendering scanlines
@@ -143,8 +143,8 @@ const Ppu = function(nes) {
             if (this.cycles === 341) {
                 this.cycles = 0;
 
-                nes.log += `cycles since render ${csRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
-                csRender = 0;
+                // nes.log += `cycles since render ${csRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
+                // csRender = 0;
 
                 if (preRender) // End of pre-rendering !
                     this.ly = 0;
@@ -171,8 +171,8 @@ const Ppu = function(nes) {
                     this.vblankAtm = true;
                     this.vblankFlag = true;
 
-                    nes.log += `cycles since vblank ${csVblank} i: ${nes.cpu.interrupting}\n`;
-                    csVblank = 0;
+                    // nes.log += `cycles since vblank ${csVblank} i: ${nes.cpu.interrupting}\n`;
+                    // csVblank = 0;
 
                     this.debugDrawNT(0);
                     return;
@@ -186,13 +186,13 @@ const Ppu = function(nes) {
                 // Vblank NMIs !
                 if (this.vblankFlag && this.nmiEnabled) {
                     nes.cpu.generateNMI();
-                    nes.log += `  NMI GENERATED !! i: ${nes.cpu.interrupting}\n`;
+                    // nes.log += `  NMI GENERATED !! i: ${nes.cpu.interrupting}\n`;
                 }
 
                 // End of vblank scanline ...
                 if (this.cycles === 341) {
-                    nes.log += `cycles since POST ${csPostRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
-                    csPostRender = 0;
+                    // nes.log += `cycles since POST ${csPostRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
+                    // csPostRender = 0;
 
                     if (this.ly === 260) // End of frame !!!
                         this.newFrame();
@@ -217,6 +217,8 @@ const Ppu = function(nes) {
 
     // TODO - make more accurate !!!
     this.newFrame = function() {
+        // nes.log += `  newFrame :: LY: ${this.ly}, mode: ${this.mode}, i: ${nes.cpu.interrupting}\n`;
+
         this.vblankAtm = false;
         this.vblankFlag = false;
 

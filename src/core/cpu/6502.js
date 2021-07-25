@@ -1263,10 +1263,10 @@ const Cpu6502 = function(nes, cpu) {
                 cpu.writeP(cpu.pop());
                 break;
             case 4:
-                oper = cpu.pop(); // Lower PC byte
+                cpu.pc = cpu.pop(); // Lower PC byte
                 break;
             case 5:
-                cpu.pc = oper | (cpu.pop() << 8);
+                cpu.pc |= cpu.pop() << 8;
                 this.reset_cycles();
                 break;
         }
@@ -1280,10 +1280,10 @@ const Cpu6502 = function(nes, cpu) {
                 // Expend cycle
                 break;
             case 3:
-                oper = cpu.pop(); // Lower PC byte
+                cpu.pc = cpu.pop(); // Lower PC byte
                 break;
             case 4:
-                cpu.pc = oper | (cpu.pop() << 8);
+                cpu.pc |= cpu.pop() << 8;
                 break;
             case 5:
                 cpu.pc++;
@@ -1768,8 +1768,7 @@ const Cpu6502 = function(nes, cpu) {
     this.execute = function() {
         // Done with instruction ?..
         if (this.opCycle === -1) {
-            //log += this.getLogLine(); // DEBUG LOG
-            //if (++logC > 8991) this.panic(0);
+            // nes.log += this.getLogLine(); // DEBUG LOG
 
             this.currIns = this.decode(
                 this.currOp = this.fetch()
@@ -1789,8 +1788,8 @@ const Cpu6502 = function(nes, cpu) {
 
     // =============== // Debugging //
     this.getLogLine = function() {
-        var hex8 = n => ('0' + n.toString(16)).slice(-2);
-        var hex16 = n => ('000' + n.toString(16)).slice(-4);
+        const hex8 = n => ('0' + n.toString(16)).slice(-2);
+        const hex16 = n => ('000' + n.toString(16)).slice(-4);
 
         return (
             // location
@@ -1809,13 +1808,14 @@ const Cpu6502 = function(nes, cpu) {
         );
     };
 
-    //var log = '';
-    //var logC = 0;
     this.panic = function() {
         nes.stop();
-        //nes.popupString(log);
 
-        throw `PANIC !! PC: ${('000' + cpu.pc.toString(16)).slice(-4)} OP: ${('0' + this.currOp.toString(16)).slice(-2)}`;
+        const msg = `PANIC !! PC: ${('000' + cpu.pc.toString(16)).slice(-4)} OP: ${('0' + this.currOp.toString(16)).slice(-2)} i: ${nes.cpu.interrupting}`;
+        // nes.log += msg;
+        // nes.popupLog();
+
+        throw msg; // Stops whatever NES is doing :D
     };
 
     // =============== // Reset Function //

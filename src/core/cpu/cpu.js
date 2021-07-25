@@ -99,7 +99,7 @@ const Cpu = function(nes) {
         }
         // Cartridge
         else {
-            return nes.mem.readCart(addr);
+            nes.mem.writeCart(addr);
         }
     };
 
@@ -131,8 +131,9 @@ const Cpu = function(nes) {
         this.intCycle++;
         switch (this.intCycle) {
             case 1:
-                this.pc++;
-                this.pc &= 0xffff;
+                // Why did i do this ,,,,,,
+                // this.pc++;
+                // this.pc &= 0xffff;
                 break;
             case 2:
                 this.push(this.pc >> 8);
@@ -152,13 +153,19 @@ const Cpu = function(nes) {
                 this.intCycle = 0;
                 this.interrupting = false;
                 this.shouldInterrupt = false;
+
+                // Clear NMI bit if its an NMI !
+                if (this.inNMI) {
+                    this.inNMI = false;
+                    nes.ppu.nmiEnabled = false;
+                }
                 break;
         }
     };
 
     // Interrupt generation
     this.generateNMI = function() {
-        if (this.interrupting)
+        if (this.shouldInterrupt)
             return;
 
         this.shouldInterrupt = true;
@@ -176,11 +183,6 @@ const Cpu = function(nes) {
             // Check for interrupts
             if (this.cpu6502.execute() && this.shouldInterrupt) {
                 this.interrupting = true;
-                // Clear NMI bit if its an NMI !
-                if (this.inNMI) {
-                    this.inNMI = false;
-                    nes.ppu.nmiEnabled = false;
-                }
             }
         }
 
