@@ -75,7 +75,7 @@ const NES = function() {
         win.document.body.innerHTML = '<pre>' + str + '</pre>';
     };
 
-    // logging
+    // Logging
     this.log = '';
     this.popupLog = function() {
         this.popupString(this.log);

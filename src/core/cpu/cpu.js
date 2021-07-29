@@ -7,9 +7,6 @@ const Cpu = function(nes) {
     this.pc = 0x0000;
     this.sp = 0x0000;
 
-    this.shouldNMI = false;
-    this.inNMI = false;
-
     // P reg
     this.p_n = false;
     this.p_v = false;
@@ -176,22 +173,25 @@ const Cpu = function(nes) {
     // =============== // Execution //
     this.cpu6502 = new Cpu6502(nes, this);
     this.stepNES = function(cycles) {
-        if (this.interrupting) {
-            this.interrupt();
-        }
-        else {
-            // Check for interrupts
-            if (this.cpu6502.execute() && this.shouldInterrupt) {
-                this.interrupting = true;
-            }
-        }
+        for (var i = 0; i < cycles; i++) {
 
-        nes.ppu.execute();
+            if (this.interrupting) {
+                this.interrupt();
+            }
+            else {
+                // Check for interrupts
+                if (this.cpu6502.execute() && this.shouldInterrupt) {
+                    this.interrupting = true;
+                }
+            }
+
+            nes.ppu.execute();
+
+        }
     };
 
     this.stepFrame = function() {
-        for (var i = 0; i < this.cyclesPerFrame; i++)
-            this.stepNES(i);
+        this.stepNES(this.cyclesPerFrame);
     };
 
     // =============== // Loop //
@@ -201,10 +201,18 @@ const Cpu = function(nes) {
     this.preMs = 0;
     this.postMs = 0;
 
+    var lc = 0;
+    var lm = 120;
     this.loop = function() {
         this.preMs = performance.now();
         this.stepFrame();
         this.postMs = performance.now();
+
+        // Debug
+        // if (++lc === lm) {
+        //     nes.popupLog();
+        //     this.cpu6502.panic();
+        // }
 
         this.timeout = setTimeout(() => {
             cpu.loop();
@@ -217,6 +225,8 @@ const Cpu = function(nes) {
 
     // =============== // Bootstrapping //
     this.reset = function() {
+        lc = 0;
+
         // Reset internal regs
         this.sp = 0xfd;
         this.pc = cpu.read16(0xfffc);

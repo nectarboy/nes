@@ -30,9 +30,11 @@ const Ppu = function(nes) {
         }
     };
 
+    this.hasChrRam = false;
     this.write = function(addr, val) {
         if (addr < 0x2000) {
-            // CHR - TODO RAM !!
+            if (this.hasChrRam)
+                mem.chr[addr & 0x3fff] = val; // 16KB CHR RAM
         }
         else if (addr < 0x2400) {
             mem.nametable[mem.nametable0map][addr - 0x2000] = val; // Nametable map 0
@@ -81,7 +83,6 @@ const Ppu = function(nes) {
 
     // =============== // Registers //
     // PPUCTRL
-    this.baseNametableAddr = 0;
     this.spriteTable = 0;
     this.bgTable = 0;
     this.spriteSize = 0;
@@ -100,21 +101,15 @@ const Ppu = function(nes) {
     this.vblankAtm = false; // actual vblank
     this.vblankFlag = false; // PPUSTAT
 
-    // PPUADDR
-    this.ppuAddr = 0;
-
     // =============== // Internal Stuff //
     this.enabled = false;
 
+    // Rendering registers
+    this.ppuAddr = 0;
+    this.tAddr = 0;
     this.fineX = 0;
-    this.coarseX = 0;
-    this.fineY = 0;
-    this.coarseY = 0;
 
     this.ly = 0;
-
-    this.currPattern = [0,0]; // hi - lo
-    this.nextPattern = [0,0]; // hi - lo
 
     this.mode = 0; // 0 in rendering scanlines, 1: post rendering 
     this.cycles = 0;
@@ -130,25 +125,57 @@ const Ppu = function(nes) {
         for (var i = 0; i < 3; i++) {
         // -------------------------------- //
 
-        // csVblank++;
-        // csRender++;
-        // csPostRender++;
+        csVblank++;
+        csRender++;
+        csPostRender++;
 
         if (this.mode === 0) {
             // Rendering scanlines
 
+            if (this.cycles === 0) {
+                this.cycles++;
+
+                // Update ppu addr
+                return;
+            }
+
+            var lx = this.cycles - 1;
             var preRender = (this.ly === 261);
 
+            // Rendering
+            if (this.enabled) {
+                // Fetch tile data ahead
+                if (lx & 7) {
+                    this.fetchAhead();
+                    this.incCoarseX();
+                }
+
+                // Fetch and render curent pixel
+                if (!preRender && lx < 256) {
+                    this.rendering.drawPx(lx, this.ly, this.getCyclePixel(lx));
+
+                    this.fineX++;
+                    this.fineX &= 7;
+                }
+                else if (lx === 256) {
+                    this.incAllY();
+                }
+            }
+
             // End of scanline ...
-            if (this.cycles === 341) {
+            if (this.cycles === 340) {
                 this.cycles = 0;
 
                 // nes.log += `cycles since render ${csRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
                 // csRender = 0;
 
-                if (preRender) // End of pre-rendering !
+                if (preRender) {            // End of pre-rendering !
                     this.ly = 0;
-                else if (this.ly === 239) // End of rendering !
+
+                    if (this.enabled) // Update ppu addr
+                        this.ppuAddr = this.tAddr;
+                }
+                else if (this.ly === 239)   // End of rendering !
                     this.mode = 1;
                 else
                     this.ly++;
@@ -164,7 +191,7 @@ const Ppu = function(nes) {
             if (!this.vblankAtm) {
 
                 // End of idle scanline ...
-                if (this.cycles === 341) {
+                if (this.cycles === 340) {
                     this.cycles = 0;
                     this.ly++;
 
@@ -175,6 +202,7 @@ const Ppu = function(nes) {
                     // csVblank = 0;
 
                     this.debugDrawNT(0);
+                    //this.rendering.renderImg();
                     return;
                 }
 
@@ -190,7 +218,7 @@ const Ppu = function(nes) {
                 }
 
                 // End of vblank scanline ...
-                if (this.cycles === 341) {
+                if (this.cycles === 340) {
                     // nes.log += `cycles since POST ${csPostRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
                     // csPostRender = 0;
 
@@ -217,6 +245,9 @@ const Ppu = function(nes) {
 
     // TODO - make more accurate !!!
     this.newFrame = function() {
+        csRender = 0;
+        csVblank = 0;
+        csPostRender = 0;
         // nes.log += `  newFrame :: LY: ${this.ly}, mode: ${this.mode}, i: ${nes.cpu.interrupting}\n`;
 
         this.vblankAtm = false;
@@ -228,23 +259,52 @@ const Ppu = function(nes) {
         this.mode = 0; // Back to rendering !
     };
 
+    this.getCyclePixel = function(lx) {
+        return 0;
+    };
+
+    this.fetchAhead = function() {
+
+    };
+
+    // PPU addr helpers
+    this.incCoarseX = function() {
+        // If overflow will occur on increment ...
+        if ((this.ppuAddr & 0b11111) === 0b11111) {
+            this.ppuAddr &= ~0b11111; // Overflow coarse x to 0
+            this.ppuAddr ^= 0b0000010000000000; // Onto next horizontal nametable
+        }
+        else this.ppuAddr++; // Increment coarse x :D
+    };
+
+    this.incAllY = function() {
+        // -- FINE Y INC
+        // If overflow will occur on increment ...
+        if ((this.ppuAddr & 0x7000) === 0x7000) {
+            this.ppuAddr &= ~0x7000; // Overflow fine y to 0
+
+            // -- COARSE Y INC
+            if ((this.ppuAddr & 0b1111100000) === 0b1111100000) {
+                this.ppuAddr &= ~0b1111100000; // Overflow coarse y to 0
+                this.ppuAddr ^= 0b0000100000000000; // Onto next vertical nametable
+            }
+            else this.ppuAddr += 0b100000; // Increment coarse x :D
+        }
+    };
+
     // =============== // Reset Function //
     this.reset = function() {
         // Reset registers
-        this.sprite0Atm = false;
-        this.vblankAtm = false;
-        this.vblankFlag = false;
-
+        this.ppuAddr = 0;
+        this.tAddr = 0;
         this.fineX = 0;
-        this.coarseX = 0;
-        this.fineY = 0;
-        this.coarseY = 0;
 
         // Reset internal stuff
         this.enabled = false;
 
-        this.currPattern[0] = this.currPattern[1] = 0;
-        this.nextPattern[0] = this.nextPattern[1] = 0;
+        this.sprite0Atm = false;
+        this.vblankAtm = false;
+        this.vblankFlag = false;
 
         this.newFrame();
     };

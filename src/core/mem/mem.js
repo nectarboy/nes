@@ -100,7 +100,9 @@ const Mem = function(nes) {
         addr &= 7;
         switch (addr) {
             case 0: { // PPUCTR
-                nes.ppu.baseNametableAddr = 0x2000 | (0x4000 * (val & 3));
+                nes.ppu.tAddr &= 0b0111001111111111;
+                nes.ppu.tAddr |= (val & 3) << 10; // Base nametable addr
+
                 this.ppuAddrInc = ((val & 0x04) !== 0) ? 32 : 1;
                 nes.ppu.spriteTable = ((val & 0x08) !== 0) ? 0x1000 : 0;
                 nes.ppu.bgTable = ((val & 0x10) !== 0) ? 0x1000 : 0;
@@ -128,25 +130,37 @@ const Mem = function(nes) {
             case 4: { // OAMDATA
                 break;
             }
-            case 5: { // PPUSCROLL
+            case 5: { // PPUSCROLL (TODO - ADD SCROLL Y VBLANK BEHAVIOR)
+                // Update y scroll
                 if (this.ppuLatch) {
-                    nes.ppu.fineY = val & 0b111;
-                    nes.ppu.coarseY = val >> 3;
+                    nes.ppu.tAddr &= 0b0000110000011111;
+
+                    nes.ppu.tAddr |= (val >> 3) << 5; // Coarse y
+                    nes.ppu.tAddr |= (val & 7) << 12; // Fine y
                 }
+                // Update x scroll
                 else {
-                    nes.ppu.fineX = val & 0b111;
-                    nes.ppu.coarseX = val >> 3;
+                    // Update x scroll
+                    nes.ppu.tAddr &= 0b0111111111100000;
+
+                    nes.ppu.tAddr |= (val >> 3);  // Coarse x
+                    nes.ppu.fineX = (val & 7);      // Fine x
                 }
 
                 this.ppuLatch = !this.ppuLatch;
                 break;
             }
             case 6: { // PPUADDR
-                var before = nes.ppu.ppuAddr;
+                if (this.ppuLatch) {
+                    nes.ppu.tAddr &= 0x3f00;
+                    nes.ppu.tAddr |= val;
 
-                var shift = this.ppuLatch ? 0 : 8;
-                nes.ppu.ppuAddr &= ~(0xff << shift);
-                nes.ppu.ppuAddr |= (val << shift);
+                    nes.ppu.ppuAddr = nes.ppu.tAddr; // Update ppu addr
+                }
+                else {
+                    nes.ppu.tAddr &= 0x00ff;
+                    nes.ppu.tAddr |= (val & 0x3f) << 8;
+                }
 
                 this.ppuLatch = !this.ppuLatch;
                 break;
@@ -209,12 +223,13 @@ const Mem = function(nes) {
         if (rom[0] !== 0x4e || rom[1] !== 0x45 || rom[2] !== 0x53 || rom[3] !== 0x1a)
             throw 'unsupported rom !';
 
-        // we just accepting nrom for now btw
+        // We just accepting nrom for now btw
         this.romSize = 0x4000 * rom[4];
         this.chrSize = 0x2000 * rom[5];
+        nes.ppu.hasChrRam = (rom[5] === 0);
         this.loadRomIntoMem(rom);
 
-        // name tables
+        // Nametables
         if (rom[6] & 1) {
             this.nametable0map = 0;
             this.nametable1map = 1;
