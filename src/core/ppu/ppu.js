@@ -109,6 +109,9 @@ const Ppu = function(nes) {
     this.tAddr = 0;
     this.fineX = 0;
 
+    this.currData = [0, 0];
+    this.preData = [0, 0];
+
     this.ly = 0;
 
     this.mode = 0; // 0 in rendering scanlines, 1: post rendering 
@@ -134,8 +137,6 @@ const Ppu = function(nes) {
 
             if (this.cycles === 0) {
                 this.cycles++;
-
-                // Update ppu addr
                 return;
             }
 
@@ -150,15 +151,22 @@ const Ppu = function(nes) {
                     this.incCoarseX();
                 }
 
-                // Fetch and render curent pixel
-                if (!preRender && lx < 256) {
-                    this.rendering.drawPx(lx, this.ly, this.getCyclePixel(lx));
+                if (!preRender) {
+                    // Fetch and render curent pixel
+                    if (lx < 256) {
+                        this.rendering.drawPx(lx, this.ly, this.getCyclePixel(lx));
 
-                    this.fineX++;
-                    this.fineX &= 7;
-                }
-                else if (lx === 256) {
-                    this.incAllY();
+                        this.fineX++;
+                        this.fineX &= 7;
+                    }
+                    // Update PPU addr for next scanline
+                    else if (lx === 256) {
+                        this.incAllY();
+
+                        // Copy horizontal scroll
+                        this.ppuAddr &= 0b0111101111100000;
+                        this.ppuAddr |= this.tAddr & 0b0000010000011111;
+                    }
                 }
             }
 
@@ -201,8 +209,8 @@ const Ppu = function(nes) {
                     // nes.log += `cycles since vblank ${csVblank} i: ${nes.cpu.interrupting}\n`;
                     // csVblank = 0;
 
-                    this.debugDrawNT(0);
-                    //this.rendering.renderImg();
+                    //this.debugDrawNT(0);
+                    this.rendering.renderImg();
                     return;
                 }
 
@@ -260,11 +268,21 @@ const Ppu = function(nes) {
     };
 
     this.getCyclePixel = function(lx) {
-        return 0;
+        const bit = (((this.currData[1] >> (lx^7)) & 1) << 1) | ((this.currData[0] >> (lx^7)) & 1);
+
+        return bit;
     };
 
     this.fetchAhead = function() {
+        this.currData[0] = this.preData[0];
+        this.currData[1] = this.preData[1];
 
+        const nametableId = 0x2000 | (this.ppuAddr & 0xfff);
+        const lo = this.read(nametableId);
+        const hi = this.read(nametableId + 8);
+
+        this.preData[0] = lo;
+        this.preData[1] = hi;
     };
 
     // PPU addr helpers
@@ -284,11 +302,15 @@ const Ppu = function(nes) {
             this.ppuAddr &= ~0x7000; // Overflow fine y to 0
 
             // -- COARSE Y INC
+            // If overflow will occur on increment ...
             if ((this.ppuAddr & 0b1111100000) === 0b1111100000) {
                 this.ppuAddr &= ~0b1111100000; // Overflow coarse y to 0
                 this.ppuAddr ^= 0b0000100000000000; // Onto next vertical nametable
             }
-            else this.ppuAddr += 0b100000; // Increment coarse x :D
+            else this.ppuAddr += 0b100000; // Increment coarse y :D
+        }
+        else {
+            this.ppuAddr += 0x1000;
         }
     };
 
@@ -298,6 +320,9 @@ const Ppu = function(nes) {
         this.ppuAddr = 0;
         this.tAddr = 0;
         this.fineX = 0;
+
+        this.currData.fill(0);
+        this.preData.fill(0);
 
         // Reset internal stuff
         this.enabled = false;
