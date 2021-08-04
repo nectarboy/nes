@@ -226,7 +226,7 @@ const Mem = function(nes) {
         // We just accepting nrom for now btw
         this.romSize = 0x4000 * rom[4];
         this.chrSize = 0x2000 * rom[5];
-        nes.ppu.hasChrRam = (rom[5] === 0);
+            nes.ppu.hasChrRam = (rom[5] === 0);
         this.loadRomIntoMem(rom);
 
         // Nametables

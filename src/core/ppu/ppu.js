@@ -25,8 +25,15 @@ const Ppu = function(nes) {
         else if (addr < 0x3000) {
             return mem.nametable[mem.nametable3map][addr - 0x2c00]; // Nametable map 3
         }
+        else if (addr < 0x3f00) {
+            return this.read(addr - 0x1000); // Mirror of nametables
+        }
         else {
-            return mem.palleteram[addr & 0x1f];
+            var masked = addr & 0x1f;
+            if ((masked & 0x10) === 0x10)
+                masked &= 0xf;
+
+            return mem.palleteram[masked];
         }
     };
 
@@ -48,8 +55,15 @@ const Ppu = function(nes) {
         else if (addr < 0x3000) {
             mem.nametable[mem.nametable3map][addr - 0x2c00] = val; // Nametable map 3
         }
+        else if (addr < 0x3f00) {
+            this.write(addr - 0x1000, val); // Mirror of nametables
+        }
         else {
-            mem.palleteram[addr & 0x1f] = val;
+            var masked = addr & 0x1f;
+            if ((masked & 0b10011) === 0b10000)
+                masked &= 0xf;
+
+            mem.palleteram[masked] = val;
         }
     };
 
@@ -73,8 +87,15 @@ const Ppu = function(nes) {
         else if (addr < 0x3000) {
             this.busData = mem.nametable[mem.nametable3map][addr - 0x2c00]; // Nametable map 3
         }
+        else if (addr < 0x3f00) {
+            this.busData = this.read(addr - 0x1000); // Mirror of nametables
+        }
         else {
-            this.busData = mem.palleteram[addr & 0x1f];
+            var masked = addr & 0x1f;
+            if ((masked & 0x10) === 0x10)
+                masked &= 0xf;
+
+            this.busData = mem.palleteram[masked];
             return this.busData; // Pallete bus doesn't need to reload data :3
         }
 
@@ -111,6 +132,8 @@ const Ppu = function(nes) {
 
     this.currData = [0, 0];
     this.preData = [0, 0];
+    this.currAttr = 0;
+    this.preAttr = 0;
 
     this.ly = 0;
 
@@ -152,22 +175,21 @@ const Ppu = function(nes) {
                     this.incCoarseX();
                 }
 
-                if (!preRender) {
-                    // Fetch and render curent pixel
-                    if (shouldDraw) {
-                        this.rendering.drawPx(lx, this.ly, this.getCyclePixel());
+                // Fetch and render curent pixel
+                if (!preRender && shouldDraw) {
+                    this.rendering.drawPx(lx, this.ly, this.getCyclePixel(lx));
+                }
+                // Update PPU addr for next scanline
+                else if (lx === 256) {
+                    this.incAllY();
 
-                        this.fineX++;
-                        this.fineX &= 7;
-                    }
-                    // Update PPU addr for next scanline
-                    else if (lx === 256) {
-                        this.incAllY();
+                    // Copy horizontal scroll
+                    this.ppuAddr &= 0b0111101111100000;
+                    this.ppuAddr |= this.tAddr & 0b0000010000011111;
 
-                        // Copy horizontal scroll
-                        this.ppuAddr &= 0b0111101111100000;
-                        this.ppuAddr |= this.tAddr & 0b0000010000011111;
-                    }
+                    // This is supposed to happen on cycle 336 but what fuckin ever
+                    this.fetchAhead();
+                    this.incCoarseX();
                 }
             }
 
@@ -178,13 +200,15 @@ const Ppu = function(nes) {
                 // nes.log += `cycles since render ${csRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
                 // csRender = 0;
 
-                if (preRender) {            // End of pre-rendering !
+                // End of pre-rendering !
+                if (preRender) {
                     this.ly = 0;
 
                     if (this.enabled) // Update ppu addr
                         this.ppuAddr = this.tAddr;
                 }
-                else if (this.ly === 239)   // End of rendering !
+                // End of rendering !
+                else if (this.ly === 239)
                     this.mode = 1;
                 else
                     this.ly++;
@@ -268,23 +292,59 @@ const Ppu = function(nes) {
         this.mode = 0; // Back to rendering !
     };
 
-    this.getCyclePixel = function() {
-        const shift = this.fineX ^ 7;
-        const bit = (((this.currData[1] >> shift) & 1) << 1) | ((this.currData[0] >> shift) & 1);
+    this.mixPixel = function(lx, bit, attr) {
+        if (bit) {
+            const region = 3 & (
+                attr >> (
+                    (((lx >> 4) & 1) << 1)
+                    | (((this.ly >> 4) & 1) << 2)
+                )
+            );
 
-        return bit;
+            const palMemAddr = 0x3f00 | (region << 2);
+            return this.read(palMemAddr + bit);
+        }
+        else {
+            return this.read(0x3f00);
+        }
+    };
+
+    this.getCyclePixel = function(lx) {
+        const sum = (lx & 7) + this.fineX;
+        const shift = ((lx + this.fineX) & 7) ^ 7;
+
+        var px = 0;
+        // Fetching pixel from current tile ...
+        if (sum <= 7) {
+            const bit = (((this.currData[1] >> shift) & 1) << 1) | ((this.currData[0] >> shift) & 1);
+            px = this.mixPixel(lx, bit, this.currAttr);
+        }
+        // Fetching pixel from next tile ... 
+        else {
+            const bit = (((this.preData[1] >> shift) & 1) << 1) | ((this.preData[0] >> shift) & 1);
+            px = this.mixPixel(lx, bit, this.preAttr);
+        }
+
+        return px;
     };
 
     this.fetchAhead = function() {
         this.currData[0] = this.preData[0];
         this.currData[1] = this.preData[1];
+        this.currAttr = this.preAttr;
 
-        const tileId = this.read(0x2000 | (this.ppuAddr & 0x0fff)); // Nametable address
+        // Pattern data
+        const nameAddr = this.read(0x2000 | (this.ppuAddr & 0x0fff)); // Nametable address
         const fineY = (this.ppuAddr >> 12);
 
-        const dataAddr = this.patTable + (tileId * 16) + fineY;
+        const dataAddr = this.patTable + (nameAddr * 16) + fineY;
         this.preData[0] = this.read(dataAddr);
         this.preData[1] = this.read(dataAddr + 8);
+
+        // Attribute data
+        const attrAddr = 0x23c0 | (this.ppuAddr & 0x0c00) | ((this.ppuAddr >> 4) & 0x38) | ((this.ppuAddr >> 2) & 7);
+        this.preAttr = this.read(attrAddr);
+
     };
 
     // PPU addr helpers
@@ -325,6 +385,8 @@ const Ppu = function(nes) {
 
         this.currData.fill(0);
         this.preData.fill(0);
+        this.currAttr = 0;
+        this.preAttr = 0;
 
         // Reset internal stuff
         this.enabled = false;
@@ -379,6 +441,16 @@ const Ppu = function(nes) {
                 }
                 // -------------------------------- //
                
+            }
+        }
+
+        this.rendering.renderImg();
+    };
+
+    this.debugDrawPallete = function() {
+        for (var i = 0; i < 4; i++) {
+            for (var ii = 0; ii < 16; ii++) {
+                this.rendering.drawPx(ii, i, i*16 + ii);
             }
         }
 

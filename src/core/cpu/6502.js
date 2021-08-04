@@ -1647,6 +1647,7 @@ const Cpu6502 = function(nes, cpu) {
             case 0x51: return this.eor_ind_y;
             case 0x55: return this.eor_zp_x;
             case 0x56: return this.lsr_zp_x;
+            case 0x58: return this.cli;
             case 0x59: return this.eor_abs_y;
             case 0x5d: return this.eor_abs_x;
             case 0x5e: return this.lsr_abs_x;
