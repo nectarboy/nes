@@ -202,13 +202,12 @@ const Cpu = function(nes) {
     this.postMs = 0;
 
     var lc = 0;
-    var lm = 120;
+    var lm = 5;
     this.loop = function() {
         this.preMs = performance.now();
         this.stepFrame();
         this.postMs = performance.now();
 
-        // Debug
         // if (++lc === lm) {
         //     nes.popupLog();
         //     this.cpu6502.panic();

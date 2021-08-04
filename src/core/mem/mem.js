@@ -105,7 +105,7 @@ const Mem = function(nes) {
 
                 this.ppuAddrInc = ((val & 0x04) !== 0) ? 32 : 1;
                 nes.ppu.spriteTable = ((val & 0x08) !== 0) ? 0x1000 : 0;
-                nes.ppu.bgTable = ((val & 0x10) !== 0) ? 0x1000 : 0;
+                nes.ppu.patTable = ((val & 0x10) !== 0) ? 0x1000 : 0;
                 nes.ppu.spriteSize = ((val & 0x20) !== 0) ? 16 : 8;
                 nes.ppu.masterSelect = (val & 0x40) !== 0;
                 nes.ppu.nmiEnabled = (val & 0x80) !== 0;

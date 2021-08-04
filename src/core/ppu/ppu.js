@@ -84,7 +84,7 @@ const Ppu = function(nes) {
     // =============== // Registers //
     // PPUCTRL
     this.spriteTable = 0;
-    this.bgTable = 0;
+    this.patTable = 0;
     this.spriteSize = 0;
     this.masterSelect = false;
     this.nmiEnabled = false;
@@ -140,21 +140,22 @@ const Ppu = function(nes) {
                 return;
             }
 
-            var lx = this.cycles - 1;
-            var preRender = (this.ly === 261);
+            const lx = this.cycles - 1;
+            const preRender = (this.ly === 261);
 
             // Rendering
             if (this.enabled) {
                 // Fetch tile data ahead
-                if (lx & 7) {
+                const shouldDraw = (lx < 256);
+                if (shouldDraw && (lx & 7) === 0) {
                     this.fetchAhead();
                     this.incCoarseX();
                 }
 
                 if (!preRender) {
                     // Fetch and render curent pixel
-                    if (lx < 256) {
-                        this.rendering.drawPx(lx, this.ly, this.getCyclePixel(lx));
+                    if (shouldDraw) {
+                        this.rendering.drawPx(lx, this.ly, this.getCyclePixel());
 
                         this.fineX++;
                         this.fineX &= 7;
@@ -267,8 +268,9 @@ const Ppu = function(nes) {
         this.mode = 0; // Back to rendering !
     };
 
-    this.getCyclePixel = function(lx) {
-        const bit = (((this.currData[1] >> (lx^7)) & 1) << 1) | ((this.currData[0] >> (lx^7)) & 1);
+    this.getCyclePixel = function() {
+        const shift = this.fineX ^ 7;
+        const bit = (((this.currData[1] >> shift) & 1) << 1) | ((this.currData[0] >> shift) & 1);
 
         return bit;
     };
@@ -277,12 +279,12 @@ const Ppu = function(nes) {
         this.currData[0] = this.preData[0];
         this.currData[1] = this.preData[1];
 
-        const nametableId = 0x2000 | (this.ppuAddr & 0xfff);
-        const lo = this.read(nametableId);
-        const hi = this.read(nametableId + 8);
+        const tileId = this.read(0x2000 | (this.ppuAddr & 0x0fff)); // Nametable address
+        const fineY = (this.ppuAddr >> 12);
 
-        this.preData[0] = lo;
-        this.preData[1] = hi;
+        const dataAddr = this.patTable + (tileId * 16) + fineY;
+        this.preData[0] = this.read(dataAddr);
+        this.preData[1] = this.read(dataAddr + 8);
     };
 
     // PPU addr helpers
@@ -290,9 +292,9 @@ const Ppu = function(nes) {
         // If overflow will occur on increment ...
         if ((this.ppuAddr & 0b11111) === 0b11111) {
             this.ppuAddr &= ~0b11111; // Overflow coarse x to 0
-            this.ppuAddr ^= 0b0000010000000000; // Onto next horizontal nametable
+            this.ppuAddr ^= 0b10000000000; // Onto next horizontal nametable
         }
-        else this.ppuAddr++; // Increment coarse x :D
+        else this.ppuAddr += 1; // Increment coarse x :D
     };
 
     this.incAllY = function() {
@@ -366,8 +368,8 @@ const Ppu = function(nes) {
 
                 // -------------------------------- //
                 for (var y = 0; y < 8; y++) {
-                    var hi = this.read(this.bgTable + ind + y + 8);
-                    var lo = this.read(this.bgTable + ind + y);
+                    var hi = this.read(this.patTable + ind + y + 8);
+                    var lo = this.read(this.patTable + ind + y);
 
                     for (var x = 0; x < 8; x++) {
                         var pxData = (((hi >> (x^7)) & 1) << 1) | ((lo >> (x^7)) & 1);
