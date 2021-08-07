@@ -59,6 +59,10 @@ const NES = function() {
         this.cpu.reset();
         this.ppu.reset();
         this.mem.reset();
+
+        // Clear screen
+        this.ppu.rendering.clearImg();
+        this.ppu.rendering.renderImg();
     };
 
     this.loadRomBuff = function(rom) {

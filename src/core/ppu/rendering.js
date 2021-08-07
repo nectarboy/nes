@@ -29,6 +29,12 @@ const rendering = {
 
     renderImg() {
         this.ctx.putImageData(this.img, 0, 0);
+    },
+
+    clearImg() {
+        for (var i = 0; i < constants.screen_height; i++)
+            for (var ii = 0; ii < constants.screen_width; ii++)
+                this.drawPx(ii, i, 0x0f); // Color 0x0f is black
     }
     
 };

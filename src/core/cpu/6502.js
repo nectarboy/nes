@@ -1762,7 +1762,7 @@ const Cpu6502 = function(nes, cpu) {
             case 0xfe: return this.inc_abs_x;
 
             default:
-                this.panic();
+                return this.nop;
         }
     };
 

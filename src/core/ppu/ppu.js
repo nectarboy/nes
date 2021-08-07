@@ -187,6 +187,13 @@ const Ppu = function(nes) {
                     this.ppuAddr &= 0b0111101111100000;
                     this.ppuAddr |= this.tAddr & 0b0000010000011111;
 
+                    // This is supposed to happen on cycle 304 but what fuckin ever
+                    if (preRender) {
+                        // Copy vertical scroll
+                        this.ppuAddr &= 0b0000010000011111;
+                        this.ppuAddr |= this.tAddr & 0b0111101111100000;
+                    }
+
                     // This is supposed to happen on cycle 336 but what fuckin ever
                     this.fetchAhead();
                     this.incCoarseX();
@@ -203,15 +210,15 @@ const Ppu = function(nes) {
                 // End of pre-rendering !
                 if (preRender) {
                     this.ly = 0;
-
-                    if (this.enabled) // Update ppu addr
-                        this.ppuAddr = this.tAddr;
                 }
                 // End of rendering !
-                else if (this.ly === 239)
+                else if (this.ly === 239) {
                     this.mode = 1;
-                else
+                }
+                // Next scanline !
+                else {
                     this.ly++;
+                }
 
                 return;
             }
@@ -283,6 +290,7 @@ const Ppu = function(nes) {
         csPostRender = 0;
         // nes.log += `  newFrame :: LY: ${this.ly}, mode: ${this.mode}, i: ${nes.cpu.interrupting}\n`;
 
+        this.sprite0Atm = false;
         this.vblankAtm = false;
         this.vblankFlag = false;
 
@@ -293,11 +301,21 @@ const Ppu = function(nes) {
     };
 
     this.mixPixel = function(lx, bit, attr) {
+        const coarseX = this.ppuAddr - (lx >> 3) + 2; // The +2 is bullshit lmao
+
+        var x = lx + (((coarseX & 1) << 3) | this.fineX);
+        const y = this.ly +
+            (((this.ppuAddr >> 5) - (this.ly >> 3) & 3) << 3) // Combine coarse y ...
+            | (this.ppuAddr >> 12); // ... with fine y !
+
+        // If in middle of current attribute byte, do some magic ...
+        x -= (coarseX & 0b10) << 3; // If bit set, sub region-check x by 16
+
         if (bit) {
             const region = 3 & (
                 attr >> (
-                    (((lx >> 4) & 1) << 1)
-                    | (((this.ly >> 4) & 1) << 2)
+                    (((x >> 4) & 1) << 1)
+                    | (((y >> 4) & 1) << 2)
                 )
             );
 
@@ -315,7 +333,8 @@ const Ppu = function(nes) {
 
         var px = 0;
         // Fetching pixel from current tile ...
-        if (sum <= 7) {
+        const scrollInBounds = sum <= 7;
+        if (scrollInBounds) {
             const bit = (((this.currData[1] >> shift) & 1) << 1) | ((this.currData[0] >> shift) & 1);
             px = this.mixPixel(lx, bit, this.currAttr);
         }
@@ -364,12 +383,20 @@ const Ppu = function(nes) {
             this.ppuAddr &= ~0x7000; // Overflow fine y to 0
 
             // -- COARSE Y INC
-            // If overflow will occur on increment ...
-            if ((this.ppuAddr & 0b1111100000) === 0b1111100000) {
+            const coarseY = (this.ppuAddr >> 5) & 0b11111;
+
+            // If reached bottom of resolution ...
+            if (coarseY === 29) {
                 this.ppuAddr &= ~0b1111100000; // Overflow coarse y to 0
                 this.ppuAddr ^= 0b0000100000000000; // Onto next vertical nametable
             }
-            else this.ppuAddr += 0b100000; // Increment coarse y :D
+            // If overflow will occur on increment ...
+            else if (coarseY === 31) {
+                this.ppuAddr &= ~0b1111100000; // Overflow coarse y to 0
+            }
+            else {
+                this.ppuAddr += 0b100000; // Increment coarse y :D
+            }
         }
         else {
             this.ppuAddr += 0x1000;
