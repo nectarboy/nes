@@ -2,7 +2,7 @@ import constants from './constants.js';
 import Cpu from './cpu/cpu.js';
 import Ppu from './ppu/ppu.js';
 import Mem from './mem/mem.js';
-import Joypad from './Joypad/joypad.js';
+import Joypad from './joypad/joypad.js';
 
 const NES = function() {
     var nes = this;
