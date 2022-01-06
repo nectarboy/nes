@@ -14,13 +14,13 @@ If issues show up though, (or if i manage to make it fast enough), ill do my bes
 
 ![super fuckin mario](https://github.com/nectarboy/nes/blob/main/pics/Super_Mario_Bros/title.png?raw=true)
 ![red panda <3](https://github.com/nectarboy/nes/blob/main/pics/Homebrew/redpanda.png?raw=true)
-![donkey fuck](https://github.com/nectarboy/nes/blob/main/pics/Donkey_Kong/title.png?raw=true)
+![donkey fuck](https://github.com/nectarboy/nes/blob/main/pics/Donkey_Kong/donkey.png?raw=true)
 
 ---
 
 ## how is it ?
 ```
-POOPTENDO STATUS :: horse manure is slowly being sniffed and sweeped
+POOPTENDO STATUS :: horse manure is beginning to clear out
 ```
 
 Pooptendo is being written in JS atm, however, i wanna remake it in C sometime !
@@ -30,7 +30,7 @@ Pooptendo is being written in JS atm, however, i wanna remake it in C sometime !
 
 ```
 - cpu           (%90)
-- ppu           (%70)
+- ppu           (%90)
 - cartridge     (%20)
 - apu           (%0)
 - joypad        (%0)

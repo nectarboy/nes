@@ -30,7 +30,7 @@ const Ppu = function(nes) {
         }
         else {
             var masked = addr & 0x1f;
-            if ((masked & 0x10) === 0x10)
+            if ((masked & 0b10011) === 0b10000)
                 masked &= 0xf;
 
             return mem.palleteram[masked];
@@ -92,7 +92,7 @@ const Ppu = function(nes) {
         }
         else {
             var masked = addr & 0x1f;
-            if ((masked & 0x10) === 0x10)
+            if ((masked & 0b10011) === 0b10000)
                 masked &= 0xf;
 
             this.busData = mem.palleteram[masked];
@@ -104,7 +104,7 @@ const Ppu = function(nes) {
 
     // =============== // Registers //
     // PPUCTRL
-    this.spriteTable = 0;
+    this.spritePatTable = 0;
     this.patTable = 0;
     this.spriteSize = 0;
     this.masterSelect = false;
@@ -119,6 +119,7 @@ const Ppu = function(nes) {
 
     // PPUSTATUS
     this.sprite0Atm = false;
+    this.sprite0Happened = false;
     this.vblankAtm = false; // actual vblank
     this.vblankFlag = false; // PPUSTAT
 
@@ -130,11 +131,34 @@ const Ppu = function(nes) {
     this.tAddr = 0;
     this.fineX = 0;
 
-    this.currData = [0, 0];
-    this.preData = [0, 0];
+    // Background registers
+    this.currData = new Uint8Array(2);
+    this.preData = new Uint8Array(2);
     this.currAttr = 0;
     this.preAttr = 0;
 
+    // Sprite registers
+    this.oamAddr = 0;
+    this.spritesThisLine = 0;
+    this.sOam = new Uint8Array(8 * 4);
+    this.sData = new Uint8Array(8 * 2);
+    this.sAttr = [];
+    this.sX = new Uint8Array(8);
+
+    this.bgMap = new Uint8Array(constants.screen_width * constants.screen_height);
+
+    this.resetSAttr = function() {
+        for (var i = 0; i < 8; i++) {
+            this.sAttr[i] = {
+                pallete: 0,
+                priority: false,
+                xflip: false,
+                yflip: false
+            };
+        }
+    };
+
+    // Internal stuff
     this.ly = 0;
 
     this.mode = 0; // 0 in rendering scanlines, 1: post rendering 
@@ -143,17 +167,13 @@ const Ppu = function(nes) {
     this.oddFrame = 0;
 
     // =============== // Execution //
-    var csVblank = 0;
-    var csRender = 0;
-    var csPostRender = 0;
+    // var csVblank = 0;
+    // var csRender = 0;
+    // var csPostRender = 0;
 
     this.execute = function() {
         for (var i = 0; i < 3; i++) {
         // -------------------------------- //
-
-        csVblank++;
-        csRender++;
-        csPostRender++;
 
         if (this.mode === 0) {
             // Rendering scanlines
@@ -171,13 +191,19 @@ const Ppu = function(nes) {
                 // Fetch tile data ahead
                 const shouldDraw = (lx < 256);
                 if (shouldDraw && (lx & 7) === 0) {
-                    this.fetchAhead();
+                    this.fetchBgAhead();
                     this.incCoarseX();
+                    this.fetchSpriteAhead();
                 }
 
-                // Fetch and render curent pixel
-                if (!preRender && shouldDraw) {
-                    this.rendering.drawPx(lx, this.ly, this.getCyclePixel(lx));
+                // Fetch and render current pixel
+                if (shouldDraw && !preRender) {
+                    //this.spriteEval(); // An accurate method (???)
+
+                    var px = this.getBgPixel(lx);
+                    px = this.getSpritePixel(lx, px);
+
+                    this.rendering.drawPx(lx, this.ly, px);
                 }
                 // Update PPU addr for next scanline
                 else if (lx === 256) {
@@ -187,6 +213,9 @@ const Ppu = function(nes) {
                     this.ppuAddr &= 0b0111101111100000;
                     this.ppuAddr |= this.tAddr & 0b0000010000011111;
 
+                    // Sprite evaluation finishes on cycle 256
+                    this.quickSpriteEval();
+
                     // This is supposed to happen on cycle 304 but what fuckin ever
                     if (preRender) {
                         // Copy vertical scroll
@@ -194,8 +223,11 @@ const Ppu = function(nes) {
                         this.ppuAddr |= this.tAddr & 0b0111101111100000;
                     }
 
+                    // This is supposed to happen until cycle 320 but what. fuckin. ever
+                    this.fetchSpriteAhead();
+
                     // This is supposed to happen on cycle 336 but what fuckin ever
-                    this.fetchAhead();
+                    this.fetchBgAhead();
                     this.incCoarseX();
                 }
             }
@@ -285,12 +317,13 @@ const Ppu = function(nes) {
 
     // TODO - make more accurate !!!
     this.newFrame = function() {
-        csRender = 0;
-        csVblank = 0;
-        csPostRender = 0;
+        // csRender = 0;
+        // csVblank = 0;
+        // csPostRender = 0;
         // nes.log += `  newFrame :: LY: ${this.ly}, mode: ${this.mode}, i: ${nes.cpu.interrupting}\n`;
 
         this.sprite0Atm = false;
+        this.sprite0Happened = false;
         this.vblankAtm = false;
         this.vblankFlag = false;
 
@@ -300,7 +333,8 @@ const Ppu = function(nes) {
         this.mode = 0; // Back to rendering !
     };
 
-    this.mixPixel = function(lx, bit, attr) {
+    // Background rendering
+    this.mixBgPixel = function(lx, bit, attr) {
         const coarseX = this.ppuAddr - (lx >> 3) + 2; // The +2 is bullshit lmao
 
         var x = lx + (((coarseX & 1) << 3) | this.fineX);
@@ -320,43 +354,153 @@ const Ppu = function(nes) {
             );
 
             const palMemAddr = 0x3f00 | (region << 2);
-            return this.read(palMemAddr + bit);
+            return this.read(palMemAddr | bit);
         }
         else {
             return this.read(0x3f00);
         }
     };
 
-    this.getCyclePixel = function(lx) {
+    this.getBgPixel = function(lx) {
+        if (!this.bgEnabled)
+            this.read(0x3f00);
+
         const sum = (lx & 7) + this.fineX;
         const shift = ((lx + this.fineX) & 7) ^ 7;
 
         var px = 0;
+        var bit = 0;
         // Fetching pixel from current tile ...
-        const scrollInBounds = sum <= 7;
-        if (scrollInBounds) {
-            const bit = (((this.currData[1] >> shift) & 1) << 1) | ((this.currData[0] >> shift) & 1);
-            px = this.mixPixel(lx, bit, this.currAttr);
+        if (sum <= 7) {
+            bit = (((this.currData[1] >> shift) & 1) << 1) | ((this.currData[0] >> shift) & 1);
+            px = this.mixBgPixel(lx, bit, this.currAttr);
         }
         // Fetching pixel from next tile ... 
         else {
-            const bit = (((this.preData[1] >> shift) & 1) << 1) | ((this.preData[0] >> shift) & 1);
-            px = this.mixPixel(lx, bit, this.preAttr);
+            bit = (((this.preData[1] >> shift) & 1) << 1) | ((this.preData[0] >> shift) & 1);
+            px = this.mixBgPixel(lx, bit, this.preAttr);
+        }
+
+        this.bgMap[this.ly * constants.screen_width + lx] = bit;
+        return px;
+    };
+
+    // Sprite rendering
+    this.getSpritePixel = function(lx, px) {
+        if (!this.spritesEnabled)
+            return px;
+
+        for (var i = 0; i < this.spritesThisLine; i++) {
+            const oami = i * 4;
+
+            if (lx >= this.sX[i] && lx < this.sX[i] + 8) {
+                const sdatai = i * 2;
+
+                const xpx = lx - this.sX[i];
+                const ypx = this.ly - this.sOam[oami];
+
+                const shift = this.sAttr[i].xflip
+                    ? xpx & 7
+                    : (xpx & 7) ^ 7;
+
+                const bit = (((this.sData[sdatai+1] >> shift) & 1) << 1) | ((this.sData[sdatai] >> shift) & 1);
+
+                if (bit) {
+                    // Sprite 0 check
+                    if (!this.sprite0Happened && i === 0) {
+                        this.sprite0Atm = true;
+                        this.sprite0Happened = true;
+                    }
+
+                    // Priority check
+                    if (this.sAttr[i].priority && this.bgMap[this.ly * constants.screen_width + lx])
+                        continue;
+
+                    const palMemAddr = 0x3f10 | (this.sAttr[i].pallete << 2);
+                    return this.read(palMemAddr | bit);
+                }
+            }
         }
 
         return px;
     };
 
-    this.fetchAhead = function() {
+    // Sprite evaluation (WIP)
+    this.spriteEval = function() {
+
+    };
+
+    this.quickSpriteEval = function() {
+        this.spritesThisLine = 0;
+
+        for (var i = 0; i < 64; i++) {
+            const oami = (i*4 + this.oamAddr) & 0xff;
+
+            if (
+                this.ly >= mem.oam[oami] && 
+                this.ly < mem.oam[oami] + this.spriteSize
+            ) {
+                // ... if all conditions met
+                const soami = this.spritesThisLine * 4;
+                this.sOam[soami]   = mem.oam[oami];
+                this.sOam[soami+1] = mem.oam[oami+1];
+                this.sOam[soami+2] = mem.oam[oami+2];
+                this.sOam[soami+3] = mem.oam[oami+3];
+
+                this.spritesThisLine++;
+                if (this.spritesThisLine === 8) return; // [sprite overflow bug later]
+            }
+        }
+    };
+
+    // Data fetching
+    this.fetchSpriteAhead = function() {
+        this.oamAddr = 0;
+
+        // If sprites are disabled, then why bother uwu
+        if (!this.spritesEnabled)
+            return;
+
+        for (var i = 0; i < 8; i++) {
+            // If no more sprites, we done
+            if (i === this.spritesThisLine)
+                return;
+
+            const oami = i * 4;
+            const datai = i * 2;
+
+            // Attribute data
+            const attrByte = this.sOam[oami + 2];
+            this.sAttr[i].pallete = attrByte & 3;
+            this.sAttr[i].priority = (1&(attrByte >> 5)) !== 0;
+            this.sAttr[i].xflip = (1&(attrByte >> 6)) !== 0;
+            this.sAttr[i].yflip = (1&(attrByte >> 7)) !== 0;
+
+            // X data
+            this.sX[i] = this.sOam[oami + 3];
+
+            // Pattern data
+            const dataAddr =
+                this.spritePatTable + (this.sOam[oami + 1] * 16)
+                + (this.sAttr[i].yflip
+                ? (this.ly-1 - this.sOam[oami])^7
+                : (this.ly-1 - this.sOam[oami])); // The -1 is bullshit :|
+
+            this.sData[datai]     = this.read(dataAddr);
+            this.sData[datai + 1] = this.read(dataAddr + 8);
+        }
+    };
+
+    this.fetchBgAhead = function() {
         this.currData[0] = this.preData[0];
         this.currData[1] = this.preData[1];
         this.currAttr = this.preAttr;
 
         // Pattern data
-        const nameAddr = this.read(0x2000 | (this.ppuAddr & 0x0fff)); // Nametable address
+        const nameByte = this.read(0x2000 | (this.ppuAddr & 0x0fff)); // Nametable address
         const fineY = (this.ppuAddr >> 12);
 
-        const dataAddr = this.patTable + (nameAddr * 16) + fineY;
+        const dataAddr = this.patTable + (nameByte * 16) + fineY;
         this.preData[0] = this.read(dataAddr);
         this.preData[1] = this.read(dataAddr + 8);
 
@@ -415,10 +559,18 @@ const Ppu = function(nes) {
         this.currAttr = 0;
         this.preAttr = 0;
 
+        this.oamAddr = 0;
+        this.spritesThisLine = 0;
+        this.sOam.fill(0);
+        this.sData.fill(0);
+        this.resetSAttr();
+        this.sX.fill(0);
+
         // Reset internal stuff
         this.enabled = false;
 
         this.sprite0Atm = false;
+        this.sprite0Happened = false;
         this.vblankAtm = false;
         this.vblankFlag = false;
 

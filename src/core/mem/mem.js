@@ -27,20 +27,38 @@ const Mem = function(nes) {
     this.chr = new Uint8Array(0);
     this.cartram = new Uint8Array(0);
 
-    // =============== // Memory Bus (Reads And Writes) //
-    // IO register access
+    // =============== // IO Accesses //
     this.readIO = function(addr) {
-        addr -= 0x4000;
-        return 0;
+        addr &= 0x1f;
+        switch (addr) {
+
+            // TODO - figure out what happens when reading unused space
+            default: {
+                return 0;
+            }
+        }
     };
 
     this.writeIO = function(addr, val) {
-        addr -= 0x4000;
+        addr &= 0x1f;
+        switch (addr) {
+            case 0x14: { // OAMDMA
+                // Hacky DMA ,,, only for now ok u_u
+                var cpuAddr = val << 8;
+                for (var i = 0; i < 0x100; i++) {
+                    this.OAMDATAwrite(nes.cpu.read(cpuAddr));
+                    cpuAddr++;
+                }
+                break;
+            }
+        }
     };
 
-    // CPU to PPU register access
+    // =============== // CPU --> PPU Access //
+    // TODO - turn the code in the switch statements into functions
     this.ppuLatch = false;
     this.ppuAddrInc = 0;
+    this.oamLatch = false;
 
     this.CPUreadPPU = function(addr) {
         addr &= 7;
@@ -66,12 +84,19 @@ const Mem = function(nes) {
                 return byte;
                 break;
             }
-            case 3: { // OAMADDR_LO
+            case 3: { // OAMADDR
                 return 0; // OPENBUS
                 break;
             }
             case 4: { // OAMDATA
-                return 0; // todo :3
+                // When enabled and rendering ...
+                if (nes.ppu.enabled && !nes.ppu.vblankAtm) {
+                    // ???
+                }
+                // ... Vblanking (or off)
+                else {
+                    return this.oam[nes.ppu.oamAddr] & 0xe3; // Mask out the void bits
+                }
                 break;
             }
             case 5: { // PPUSCROLL
@@ -96,6 +121,19 @@ const Mem = function(nes) {
         }
     };
 
+    this.OAMDATAwrite = function(val) {
+        if (nes.ppu.enabled && !nes.ppu.vblankAtm) {
+            // ...
+        }
+        // ... Vblanking (or off)
+        else {
+            this.oam[nes.ppu.oamAddr] = val;
+
+            nes.ppu.oamAddr++;
+            nes.ppu.oamAddr &= 0xff;
+        }
+    };
+
     this.CPUwritePPU = function(addr, val) {
         addr &= 7;
         switch (addr) {
@@ -104,7 +142,7 @@ const Mem = function(nes) {
                 nes.ppu.tAddr |= (val & 3) << 10; // Base nametable addr
 
                 this.ppuAddrInc = ((val & 0x04) !== 0) ? 32 : 1;
-                nes.ppu.spriteTable = ((val & 0x08) !== 0) ? 0x1000 : 0;
+                nes.ppu.spritePatTable = ((val & 0x08) !== 0) ? 0x1000 : 0;
                 nes.ppu.patTable = ((val & 0x10) !== 0) ? 0x1000 : 0;
                 nes.ppu.spriteSize = ((val & 0x20) !== 0) ? 16 : 8;
                 nes.ppu.masterSelect = (val & 0x40) !== 0;
@@ -124,10 +162,12 @@ const Mem = function(nes) {
             case 2: { // PPUSTATUS
                 break;
             }
-            case 3: { // OAMADDR_LO
+            case 3: { // OAMADDR
+                nes.ppu.oamAddr = val;
                 break;
             }
             case 4: { // OAMDATA
+                this.OAMDATAwrite(val);
                 break;
             }
             case 5: { // PPUSCROLL (TODO - ADD SCROLL Y VBLANK BEHAVIOR)
@@ -187,9 +227,14 @@ const Mem = function(nes) {
     };
 
     this.writeCart = function(addr, val) {
+        // ...
     };
 
     // =============== // Cartridges //
+    this.romSize = 0;
+    this.chrSize = 0;
+    this.cartramSize = 0;
+
     // Loading cart
     this.loadRomBuff = function(romBuff) {
         if (typeof romBuff !== 'object')
@@ -215,9 +260,9 @@ const Mem = function(nes) {
         }
     };
 
-    this.romSize = 0;
-    this.chrSize = 0;
-    this.cartramSize = 0;
+    // Loading mappers
+    this.loadMapper = function(mapperId) {};
+
     this.loadRomProps = function(rom) {
         // iNES magic bytes
         if (rom[0] !== 0x4e || rom[1] !== 0x45 || rom[2] !== 0x53 || rom[3] !== 0x1a)
@@ -242,6 +287,12 @@ const Mem = function(nes) {
             this.nametable2map = 1;
             this.nametable3map = 1;
         }
+
+        // Mappers
+        const mapperId = (rom[6] >> 4) | (rom[7] & 0xf0);
+        console.log('mapper:', mapperId);
+
+        this.loadMapper(mapperId);
     };
 
     // =============== // Reset Function //
@@ -257,14 +308,17 @@ const Mem = function(nes) {
         this.palleteram.fill(0);
 
         // IO regs
+        for (var i = 0; i < 0x20; i++)
+            this.writeIO(i, 0);
         // PPU regs
         for (var i = 0; i < 8; i++)
             this.CPUwritePPU(i, 0);
 
         // reset properties
-        nes.ppu.ppuAddr = 0;
         this.ppuLatch = false; // Reset flip-flop
         this.ppuData = 0;
+
+        this.oamLatch = false; // Reset flip-flop
     };
 
 };

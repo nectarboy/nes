@@ -65,7 +65,7 @@ const Cpu = function(nes) {
         }
         // IO regs
         else if (addr < 0x4018) {
-            return 0; // TODO
+            nes.mem.readIO(addr);
         }
         // Test mode shit
         else if (addr < 0x4020) {
@@ -88,7 +88,7 @@ const Cpu = function(nes) {
         }
         // IO regs
         else if (addr < 0x4018) {
-            // TODO
+            nes.mem.writeIO(addr, val);
         }
         // Test mode shit
         else if (addr < 0x4020) {
