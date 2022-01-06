@@ -2,6 +2,7 @@ import constants from './constants.js';
 import Cpu from './cpu/cpu.js';
 import Ppu from './ppu/ppu.js';
 import Mem from './mem/mem.js';
+import Joypad from './Joypad/joypad.js';
 
 const NES = function() {
     var nes = this;
@@ -10,6 +11,7 @@ const NES = function() {
     this.mem = new Mem(this);
     this.cpu = new Cpu(this);
     this.ppu = new Ppu(this);
+    this.joypad = new Joypad(this);
 
     // =============== // Settings //
     this.fps = 60;
@@ -32,9 +34,12 @@ const NES = function() {
         this.ppu.rendering.initCtx(canvas);
     };
 
+    this.keyboardEnabled = false;
+
     // Default settings
     this.setPal(false);
     this.setFPS(60);
+    this.keyboardEnabled = true;
 
     // =============== // Emulation Methods //
     this.paused = true;
@@ -43,15 +48,17 @@ const NES = function() {
             return;
         this.paused = false;
 
-        // Start loop
+        // Start components
         this.cpu.loop();
+        this.joypad.keyboardAPI.start();
     };
 
     this.stop = function() {
         this.paused = true;
 
-        // Stop loop
+        // Stop components
         this.cpu.stopLoop();
+        this.joypad.keyboardAPI.stop();
     };
 
     // Reset Function
@@ -59,6 +66,7 @@ const NES = function() {
         this.cpu.reset();
         this.ppu.reset();
         this.mem.reset();
+        this.joypad.reset();
 
         // Clear screen
         this.ppu.rendering.clearImg();

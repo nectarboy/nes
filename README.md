@@ -1,8 +1,8 @@
 # pooptendo !
 This is a Nintendo Entertainment System but stuffed inside with horse manure.
-That is why it will not work when you plug any games in it.
+Games may or may not work when you plug them into this pooptendo.
 
-It is a phat WIP as you can prolly tell ...<br>
+Its a big WIP as you can prolly tell ... but some games work !<br>
 [Still, try it out ?](https://nectarboy.github.io/nes)
 
 ## what about it ?
@@ -33,7 +33,7 @@ Pooptendo is being written in JS atm, however, i wanna remake it in C sometime !
 - ppu           (%90)
 - cartridge     (%20)
 - apu           (%0)
-- joypad        (%0)
+- joypad        (%90)
 - extra stuff   (%0)
 - cool emu shit (%1 cuz its bare min rn)
 ```

@@ -31,6 +31,15 @@ const Mem = function(nes) {
     this.readIO = function(addr) {
         addr &= 0x1f;
         switch (addr) {
+            case 0x16: { // CONTROLLER 1
+                return nes.joypad.pollJoypad();
+                break;
+            }
+            case 0x17: { // CONTROLLER 2
+                nes.joypad.shiftJoypad();
+                return 0;
+                break;
+            }
 
             // TODO - figure out what happens when reading unused space
             default: {
@@ -49,6 +58,11 @@ const Mem = function(nes) {
                     this.OAMDATAwrite(nes.cpu.read(cpuAddr));
                     cpuAddr++;
                 }
+                break;
+            }
+
+            case 0x16: { // CONTROLLER 1
+                nes.joypad.strobe = (1&val) !== 0;
                 break;
             }
         }
