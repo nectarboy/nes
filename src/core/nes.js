@@ -34,12 +34,10 @@ const NES = function() {
         this.ppu.rendering.initCtx(canvas);
     };
 
-    this.keyboardEnabled = false;
-
     // Default settings
     this.setPal(false);
     this.setFPS(60);
-    this.keyboardEnabled = true;
+    this.joypad.keyboardAPI.start();
 
     // =============== // Emulation Methods //
     this.paused = true;
@@ -50,7 +48,6 @@ const NES = function() {
 
         // Start components
         this.cpu.loop();
-        this.joypad.keyboardAPI.start();
     };
 
     this.stop = function() {
@@ -58,8 +55,14 @@ const NES = function() {
 
         // Stop components
         this.cpu.stopLoop();
-        this.joypad.keyboardAPI.stop();
     };
+
+    this.togglePause = function() {
+        if (this.paused)
+            this.start();
+        else
+            this.stop();
+    }
 
     // Reset Function
     this.reset = function() {

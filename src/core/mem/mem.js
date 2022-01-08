@@ -32,7 +32,9 @@ const Mem = function(nes) {
         addr &= 0x1f;
         switch (addr) {
             case 0x16: { // CONTROLLER 1
-                return nes.joypad.pollJoypad();
+                const bit = nes.joypad.pollJoypad();
+                nes.joypad.shiftJoypad();
+                return bit;
                 break;
             }
             case 0x17: { // CONTROLLER 2
@@ -60,9 +62,11 @@ const Mem = function(nes) {
                 }
                 break;
             }
-
             case 0x16: { // CONTROLLER 1
                 nes.joypad.strobe = (1&val) !== 0;
+                if (nes.joypad.strobe) {
+                    nes.joypad.shift = 0;
+                }
                 break;
             }
         }

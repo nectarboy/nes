@@ -3,10 +3,10 @@ This is a Nintendo Entertainment System but stuffed inside with horse manure.
 Games may or may not work when you plug them into this pooptendo.
 
 Its a big WIP as you can prolly tell ... but some games work !<br>
-[Still, try it out ?](https://nectarboy.github.io/nes)
+[you can try it online :)]https://nectarboy.github.io/nes)
 
 ## what about it ?
-Pooptendo kinda aims for cycle accuracy; i want most well known (and the fun) games to work, and the final boss is that (not fun) froggy game >:D
+Pooptendo kinda aims for cycle accuracy; i want most well known (and the fun) games to work, and the final boss is that difficult-to-emulate froggy game >:D
 
 The CPU is made to be cycle accurate, though idk if its 100% correct.<br>
 The PPU is emulated to the pixel level, though it is still being worked on, and i make some sacrifices sometimes for speed.
@@ -18,7 +18,7 @@ If issues show up though, (or if i manage to make it fast enough), ill do my bes
 
 ---
 
-## how is it ?
+## functionality
 ```
 POOPTENDO STATUS :: horse manure is beginning to clear out
 ```
@@ -26,16 +26,31 @@ POOPTENDO STATUS :: horse manure is beginning to clear out
 Pooptendo is being written in JS atm, however, i wanna remake it in C sometime !
 (i hope i dont give up on that TwT)
 
-### functionality
+### controller
+these are the default keybinds, they cannot be changed atm soz lol
+```
+-- nes joypad
+D-PAD   - ARROW KEYS
+B       - X
+A       - Z
+START   - ENTER
+SELECT  - RIGHT-SHIFT
+
+-- emulator buttons
+RESET   - R
+PAUSE   - P
 
 ```
-- cpu           (%90)
-- ppu           (%90)
-- cartridge     (%20)
+
+### progress
+```
+- cpu           (%80)
+- ppu           (%80)
+- cartridge     (%15)
 - apu           (%0)
-- joypad        (%90)
+- joypad        (%85)
 - extra stuff   (%0)
-- cool emu shit (%1 cuz its bare min rn)
+- cool emu shit (%2)   >:/ HUSH OK HUSH I WILL ADD THEM
 ```
 
 ---

@@ -144,6 +144,7 @@ const Ppu = function(nes) {
     this.sData = new Uint8Array(8 * 2);
     this.sAttr = [];
     this.sX = new Uint8Array(8);
+    this.sNums = new Uint8Array(8);
 
     this.bgMap = new Uint8Array(constants.screen_width * constants.screen_height);
 
@@ -213,14 +214,15 @@ const Ppu = function(nes) {
                     this.ppuAddr &= 0b0111101111100000;
                     this.ppuAddr |= this.tAddr & 0b0000010000011111;
 
-                    // Sprite evaluation finishes on cycle 256
-                    this.quickSpriteEval();
-
                     // This is supposed to happen on cycle 304 but what fuckin ever
                     if (preRender) {
                         // Copy vertical scroll
                         this.ppuAddr &= 0b0000010000011111;
                         this.ppuAddr |= this.tAddr & 0b0111101111100000;
+                    }
+                    else {
+                        // Sprite evaluation finishes on cycle 256 but whatveer
+                        this.quickSpriteEval();
                     }
 
                     // This is supposed to happen until cycle 320 but what. fuckin. ever
@@ -362,8 +364,9 @@ const Ppu = function(nes) {
     };
 
     this.getBgPixel = function(lx) {
-        if (!this.bgEnabled)
-            this.read(0x3f00);
+        if (!this.bgEnabled) {
+            return this.read(0x3f00);
+        }
 
         const sum = (lx & 7) + this.fineX;
         const shift = ((lx + this.fineX) & 7) ^ 7;
@@ -407,7 +410,7 @@ const Ppu = function(nes) {
 
                 if (bit) {
                     // Sprite 0 check
-                    if (!this.sprite0Happened && i === 0) {
+                    if (!this.sprite0Happened && this.sNums[i] === 0) {
                         this.sprite0Atm = true;
                         this.sprite0Happened = true;
                     }
@@ -446,6 +449,7 @@ const Ppu = function(nes) {
                 this.sOam[soami+1] = mem.oam[oami+1];
                 this.sOam[soami+2] = mem.oam[oami+2];
                 this.sOam[soami+3] = mem.oam[oami+3];
+                this.sNums[this.spritesThisLine] = i;
 
                 this.spritesThisLine++;
                 if (this.spritesThisLine === 8) return; // [sprite overflow bug later]
@@ -565,6 +569,7 @@ const Ppu = function(nes) {
         this.sData.fill(0);
         this.resetSAttr();
         this.sX.fill(0);
+        this.sNums.fill(0);
 
         // Reset internal stuff
         this.enabled = false;

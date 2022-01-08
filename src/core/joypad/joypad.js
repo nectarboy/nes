@@ -23,16 +23,13 @@ const Joypad = function(nes) {
         if (this.strobe) {
             this.shift = 0;
         }
-
-        const prev = this.shift;
-        this.shift++;
-        this.shift &= 7;
-
-        return prev;
+        else if (this.shift !== 8) {
+            this.shift++;
+        }   
     };
 
     this.pollJoypad = function() {
-        switch (this.shiftJoypad()) {
+        switch (this.shift) {
             case 0: return 0|this.a;
             case 1: return 0|this.b;
             case 2: return 0|this.select;
@@ -41,6 +38,7 @@ const Joypad = function(nes) {
             case 5: return 0|this.down;
             case 6: return 0|this.left;
             case 7: return 0|this.right;
+            case 8: return 1;
         }
     };
 
@@ -50,16 +48,17 @@ const Joypad = function(nes) {
         down: 'ArrowDown',
         left: 'ArrowLeft',
         right: 'ArrowRight',
-
         b: 'KeyX',
         a: 'KeyZ',
-
         start: 'Enter',
-        select: 'ShiftRight'
+        select: 'ShiftRight',
+
+        debug_reset: 'KeyR',
+        debug_pause: 'KeyP'
     };
 
     this.keyboardAPI = {
-        // Key state setter
+        // Key state handlers
         setKeyState (code, val) {
             var keybinds = joypad.keybinds;
 
@@ -76,14 +75,12 @@ const Joypad = function(nes) {
                 case keybinds.right:
                     joypad.right = val;
                     break;
-
                 case keybinds.b:
                     joypad.b = val;
                     break;
                 case keybinds.a:
                     joypad.a = val;
                     break;
-
                 case keybinds.start:
                     joypad.start = val;
                     break;
@@ -98,6 +95,17 @@ const Joypad = function(nes) {
             return true;
         },
 
+        checkDebugKey(code) {
+            switch (code) {
+                case joypad.keybinds.debug_reset:
+                    nes.reset();
+                    break;
+                case joypad.keybinds.debug_pause:
+                    nes.togglePause();
+                    break;
+            }
+        },
+
         // Keypress handlers
         pressed: {},
 
@@ -107,8 +115,12 @@ const Joypad = function(nes) {
                 return e.preventDefault ();
             this.pressed [e.keyCode] = true;
 
-            if (this.setKeyState (e.code, true))
+            if (this.setKeyState (e.code, true)) {
                 e.preventDefault ();
+            }
+            else {
+                this.checkDebugKey(e.code);
+            }
         },
 
         onKeyUp (e) {
@@ -119,9 +131,6 @@ const Joypad = function(nes) {
 
         // Event listeners
         start () {
-            if (!nes.keyboardEnabled)
-                return;
-
             document.addEventListener ('keydown', keydownlisten);
             document.addEventListener ('keyup', keyuplisten);
         },
