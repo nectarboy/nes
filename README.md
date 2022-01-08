@@ -3,7 +3,7 @@ This is a Nintendo Entertainment System but stuffed inside with horse manure.
 Games may or may not work when you plug them into this pooptendo.
 
 Its a big WIP as you can prolly tell ... but some games work !<br>
-[you can try it online :)]https://nectarboy.github.io/nes)
+[you can try it online :)](https://nectarboy.github.io/nes)
 
 ## what about it ?
 Pooptendo kinda aims for cycle accuracy; i want most well known (and the fun) games to work, and the final boss is that difficult-to-emulate froggy game >:D
