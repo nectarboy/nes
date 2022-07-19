@@ -27,7 +27,6 @@ Pooptendo is being written in JS atm, however, i wanna remake it in C sometime !
 (i hope i dont give up on that TwT)
 
 ### controller
-these are the default keybinds, they cannot be changed atm soz lol
 ```
 -- nes joypad
 D-PAD   - ARROW KEYS
@@ -39,8 +38,9 @@ SELECT  - RIGHT-SHIFT
 -- emulator buttons
 RESET   - R
 PAUSE   - P
-
 ```
+
+These are the default keybinds, they cannot be changed atm soz lol :3
 
 ### progress
 ```

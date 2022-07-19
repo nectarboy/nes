@@ -14,9 +14,8 @@ window.nes = nes;
 
 function startNES(romBuff) {
     // romBuff should be a Uint8Array buffer
-    nes.loadRomBuff(romBuff);
     nes.stop();
-    nes.reset();
+    nes.loadRomBuff(romBuff);
     nes.start();
 }
 

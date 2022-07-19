@@ -11,7 +11,7 @@ const Ppu = function(nes) {
     // =============== // Reading and Writing //
     this.read = function(addr) {
         if (addr < 0x2000) {
-            return mem.chr[addr & (mem.chrSize-1)]; // CHR
+            return mem.readChr(addr); // 8KB addressable CHR
         }
         else if (addr < 0x2400) {
             return mem.nametable[mem.nametable0map][addr - 0x2000]; // Nametable map 0
@@ -37,11 +37,9 @@ const Ppu = function(nes) {
         }
     };
 
-    this.hasChrRam = false;
     this.write = function(addr, val) {
         if (addr < 0x2000) {
-            if (this.hasChrRam)
-                mem.chr[addr & 0x3fff] = val; // 16KB CHR RAM
+            mem.writeChr(addr, val); // 8KB addressable CHR
         }
         else if (addr < 0x2400) {
             mem.nametable[mem.nametable0map][addr - 0x2000] = val; // Nametable map 0
@@ -73,7 +71,7 @@ const Ppu = function(nes) {
         var oldBusData = this.busData;
 
         if (addr < 0x2000) {
-            this.busData = mem.chr[addr & (mem.chrSize-1)]; // CHR
+            this.busData = mem.readChr(addr); // CHR
         }
         else if (addr < 0x2400) {
             this.busData = mem.nametable[mem.nametable0map][addr - 0x2000]; // Nametable map 0
@@ -107,6 +105,7 @@ const Ppu = function(nes) {
     this.spritePatTable = 0;
     this.patTable = 0;
     this.spriteSize = 0;
+    this.doubleSprites = false;
     this.masterSelect = false;
     this.nmiEnabled = false;
 
@@ -118,13 +117,16 @@ const Ppu = function(nes) {
     this.spritesEnabled = false;
 
     // PPUSTATUS
-    this.sprite0Atm = false;
     this.sprite0Happened = false;
-    this.vblankAtm = false; // actual vblank
     this.vblankFlag = false; // PPUSTAT
 
     // =============== // Internal Stuff //
+    this.sprite0Atm = false;
+    this.vblankAtm = false; // actual vblank
     this.enabled = false;
+
+    this.considerNmiEnabled = false;
+    this.framesElapsed = 0;
 
     // Rendering registers
     this.ppuAddr = 0;
@@ -164,28 +166,29 @@ const Ppu = function(nes) {
 
     this.mode = 0; // 0 in rendering scanlines, 1: post rendering 
     this.cycles = 0;
+    this.preRender = false;
 
     this.oddFrame = 0;
 
     // =============== // Execution //
-    // var csVblank = 0;
-    // var csRender = 0;
-    // var csPostRender = 0;
 
     this.execute = function() {
         for (var i = 0; i < 3; i++) {
         // -------------------------------- //
 
+        // Rendering scanlines
         if (this.mode === 0) {
-            // Rendering scanlines
 
+            // Idle cycle
             if (this.cycles === 0) {
                 this.cycles++;
                 return;
             }
+            else if (this.vblankFlag && this.preRender && this.cycles === 1) {
+                this.vblankFlag = false;
+            }
 
-            const lx = this.cycles - 1;
-            const preRender = (this.ly === 261);
+            var lx = this.cycles - 1;
 
             // Rendering
             if (this.enabled) {
@@ -198,7 +201,7 @@ const Ppu = function(nes) {
                 }
 
                 // Fetch and render current pixel
-                if (shouldDraw && !preRender) {
+                if (shouldDraw && !this.preRender) {
                     //this.spriteEval(); // An accurate method (???)
 
                     var px = this.getBgPixel(lx);
@@ -215,7 +218,7 @@ const Ppu = function(nes) {
                     this.ppuAddr |= this.tAddr & 0b0000010000011111;
 
                     // This is supposed to happen on cycle 304 but what fuckin ever
-                    if (preRender) {
+                    if (this.preRender) {
                         // Copy vertical scroll
                         this.ppuAddr &= 0b0000010000011111;
                         this.ppuAddr |= this.tAddr & 0b0111101111100000;
@@ -238,16 +241,15 @@ const Ppu = function(nes) {
             if (this.cycles === 340) {
                 this.cycles = 0;
 
-                // nes.log += `cycles since render ${csRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
-                // csRender = 0;
-
                 // End of pre-rendering !
-                if (preRender) {
+                if (this.preRender) {
                     this.ly = 0;
+                    this.preRender = false;
                 }
                 // End of rendering !
                 else if (this.ly === 239) {
                     this.mode = 1;
+                    this.ly++;
                 }
                 // Next scanline !
                 else {
@@ -258,10 +260,10 @@ const Ppu = function(nes) {
             }
 
         }
+        // Post rendering scanlines
         else {
-            // Post rendering scanlines
 
-            // Idle scanline ...
+            // First idle scanline (240)
             if (!this.vblankAtm) {
 
                 // End of idle scanline ...
@@ -269,35 +271,35 @@ const Ppu = function(nes) {
                     this.cycles = 0;
                     this.ly++;
 
-                    this.vblankAtm = true;
-                    this.vblankFlag = true;
-
-                    // nes.log += `cycles since vblank ${csVblank} i: ${nes.cpu.interrupting}\n`;
-                    // csVblank = 0;
+                    this.vblankAtm = true; // Actual status
+                    //this.vblankFlag = true; // Read / Used for NMI
 
                     //this.debugDrawNT(0);
-                    this.rendering.renderImg();
+                    this.rendering.renderImg(); // Render ^_^
+                    //this.debugDrawChr();
                     return;
                 }
 
             }
 
-            // Vblank scanlines ...
+            // Vblank scanlines (241 - 260)
             else {
 
+                if (this.ly === 241 && this.cycles === 1) {
+                    this.vblankFlag = true; // Read / Used for NMI``
+                }
+
                 // Vblank NMIs !
-                if (this.vblankFlag && this.nmiEnabled) {
+                if (this.considerNmiEnabled && this.vblankFlag) {
                     nes.cpu.generateNMI();
-                    // nes.log += `  NMI GENERATED !! i: ${nes.cpu.interrupting}\n`;
                 }
 
                 // End of vblank scanline ...
                 if (this.cycles === 340) {
-                    // nes.log += `cycles since POST ${csPostRender} (${this.ly}) i: ${nes.cpu.interrupting}\n`;
-                    // csPostRender = 0;
-
-                    if (this.ly === 260) // End of frame !!!
+                    // End of frame ! ! !
+                    if (this.ly === 260) {
                         this.newFrame();
+                    }
                     else {
                         this.cycles = 0;
                         this.ly++;
@@ -319,17 +321,16 @@ const Ppu = function(nes) {
 
     // TODO - make more accurate !!!
     this.newFrame = function() {
-        // csRender = 0;
-        // csVblank = 0;
-        // csPostRender = 0;
-        // nes.log += `  newFrame :: LY: ${this.ly}, mode: ${this.mode}, i: ${nes.cpu.interrupting}\n`;
+        this.framesElapsed++;
 
+        this.considerNmiEnabled = this.nmiEnabled;
         this.sprite0Atm = false;
         this.sprite0Happened = false;
         this.vblankAtm = false;
         this.vblankFlag = false;
 
         this.cycles = 0;
+        this.preRender = true;
 
         this.ly = 261; // Set to pre-render scanline
         this.mode = 0; // Back to rendering !
@@ -451,8 +452,16 @@ const Ppu = function(nes) {
                 this.sOam[soami+3] = mem.oam[oami+3];
                 this.sNums[this.spritesThisLine] = i;
 
+                // Fix attribute data
+                const attrByte = this.sOam[soami + 2];
+                this.sAttr[this.spritesThisLine].pallete = attrByte & 3;
+                this.sAttr[this.spritesThisLine].priority = (1&(attrByte >> 5)) !== 0;
+                this.sAttr[this.spritesThisLine].xflip = (1&(attrByte >> 6)) !== 0;
+                this.sAttr[this.spritesThisLine].yflip = (1&(attrByte >> 7)) !== 0;
+
                 this.spritesThisLine++;
-                if (this.spritesThisLine === 8) return; // [sprite overflow bug later]
+                if (this.spritesThisLine === 8)
+                    return; // [sprite overflow bug later]
             }
         }
     };
@@ -473,25 +482,39 @@ const Ppu = function(nes) {
             const oami = i * 4;
             const datai = i * 2;
 
-            // Attribute data
-            const attrByte = this.sOam[oami + 2];
-            this.sAttr[i].pallete = attrByte & 3;
-            this.sAttr[i].priority = (1&(attrByte >> 5)) !== 0;
-            this.sAttr[i].xflip = (1&(attrByte >> 6)) !== 0;
-            this.sAttr[i].yflip = (1&(attrByte >> 7)) !== 0;
+            // Attribute data (NOTE :: should this be done every fetch ?? cant we just do this once on eval)
+            // const attrByte = this.sOam[oami + 2];
+            // this.sAttr[i].pallete = attrByte & 3;
+            // this.sAttr[i].priority = (1&(attrByte >> 5)) !== 0;
+            // this.sAttr[i].xflip = (1&(attrByte >> 6)) !== 0;
+            // this.sAttr[i].yflip = (1&(attrByte >> 7)) !== 0;
 
             // X data
             this.sX[i] = this.sOam[oami + 3];
 
             // Pattern data
-            const dataAddr =
-                this.spritePatTable + (this.sOam[oami + 1] * 16)
-                + (this.sAttr[i].yflip
-                ? (this.ly-1 - this.sOam[oami])^7
-                : (this.ly-1 - this.sOam[oami])); // The -1 is bullshit :|
+            var sy = (this.ly-1) - this.sOam[oami]; // The -1 is bullshit :|
+            var tileind = this.sOam[oami + 1]
+            var pattable = this.spritePatTable;
+            if (this.doubleSprites) {
+                pattable = (tileind & 1) << 12;
+                if (this.sAttr[i].yflip) {
+                    tileind = (tileind | 1) - (sy >= 8);
+                    sy = (sy & 7) ^ 7;
+                }
+                else {
+                    tileind = (tileind & 0xfe) + (sy >= 8);
+                    sy &= 7;
+                }
+            }
+            else if (this.sAttr[i].yflip) {
+                sy ^= 7;
+            }
 
-            this.sData[datai]     = this.read(dataAddr);
-            this.sData[datai + 1] = this.read(dataAddr + 8);
+            var dataAddr = pattable + (tileind * 16) + sy;
+
+            this.sData[datai]     = mem.readChr(dataAddr);
+            this.sData[datai + 1] = mem.readChr(dataAddr + 8);
         }
     };
 
@@ -576,6 +599,8 @@ const Ppu = function(nes) {
 
         this.sprite0Atm = false;
         this.sprite0Happened = false;
+        this.reqNmiThisFrame = false;
+        this.framesElapsed = 0;
         this.vblankAtm = false;
         this.vblankFlag = false;
 

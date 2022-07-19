@@ -1,4 +1,4 @@
-import Cpu6502 from './6502.js';
+import Cpu6502 from './cpu6502.js';
 
 const Cpu = function(nes) {
     var cpu = this;
@@ -96,7 +96,7 @@ const Cpu = function(nes) {
         }
         // Cartridge
         else {
-            nes.mem.writeCart(addr);
+            nes.mem.writeCart(addr, val);
         }
     };
 
@@ -121,41 +121,33 @@ const Cpu = function(nes) {
     this.intCycle = 0;
     this.intVec = 0;
     this.interrupting = false;
-    this.inNMI = false;
     this.shouldInterrupt = false;
 
     this.interrupt = function() {
         this.intCycle++;
         switch (this.intCycle) {
             case 1:
-                // Why did i do this ,,,,,,
-                // this.pc++;
-                // this.pc &= 0xffff;
-                break;
             case 2:
-                this.push(this.pc >> 8);
+                // Some kind of useless read or whatever
                 break;
             case 3:
-                this.push(this.pc & 0xff);
+                this.push(this.pc >> 8);
                 break;
             case 4:
-                this.push(this.getP());
+                this.push(this.pc & 0xff);
                 break;
             case 5:
-                this.pc = this.read(this.intVec);
+                this.push(this.getP());
                 break;
             case 6:
+                this.pc = this.read(this.intVec);
+                break;
+            case 7:
                 this.pc |= this.read(this.intVec + 1) << 8;
 
                 this.intCycle = 0;
                 this.interrupting = false;
                 this.shouldInterrupt = false;
-
-                // Clear NMI bit if its an NMI !
-                if (this.inNMI) {
-                    this.inNMI = false;
-                    nes.ppu.nmiEnabled = false;
-                }
                 break;
         }
     };
@@ -166,20 +158,21 @@ const Cpu = function(nes) {
             return;
 
         this.shouldInterrupt = true;
-        this.inNMI = true;
         this.intVec = 0xfffa;
+        nes.ppu.considerNmiEnabled = false;
+        //nes.ppu.vblankFlag = false;
     };
 
     // =============== // Execution //
     this.cpu6502 = new Cpu6502(nes, this);
     this.stepNES = function(cycles) {
-        for (var i = 0; i < cycles; i++) {
+        while (cycles > 0) {
 
             if (this.interrupting) {
                 this.interrupt();
             }
             else {
-                // Check for interrupts
+                // Check for interrupts (if done with inst and flipflop set, next 'inst' will be int)
                 if (this.cpu6502.execute() && this.shouldInterrupt) {
                     this.interrupting = true;
                 }
@@ -187,10 +180,12 @@ const Cpu = function(nes) {
 
             nes.ppu.execute();
 
+            cycles--;
         }
     };
 
     this.stepFrame = function() {
+        this.framesElapsed++;
         this.stepNES(this.cyclesPerFrame);
     };
 
@@ -200,13 +195,37 @@ const Cpu = function(nes) {
 
     this.preMs = 0;
     this.postMs = 0;
+    this.excessMs = 0;
+    this.frameskip = false; // Pooptendo will try its best to run at full speed
+    this.firstFrame = false;
+    this.framesElapsed = 0;
 
     var lc = 0;
     var lm = 5;
     this.loop = function() {
-        this.preMs = performance.now();
-        this.stepFrame();
-        this.postMs = performance.now();
+        if (this.frameskip) {
+            if (this.firstFrame) {
+                this.firstFrame = false;
+                this.preMs = performance.now();
+            }
+            else {
+                this.preMs = this.postMs;
+            }
+
+            this.postMs = performance.now();
+            this.excessMs += this.postMs - this.preMs;
+
+            while (this.excessMs >= 0) {
+                this.excessMs -= this.interval;
+                this.stepFrame();
+            }
+        }
+        else {
+            this.firstFrame = true;
+            this.stepFrame();
+        }
+
+        //nes.ppu.rendering.renderImg(); // Choppy ;_;
 
         // if (++lc === lm) {
         //     nes.popupLog();
@@ -215,10 +234,15 @@ const Cpu = function(nes) {
 
         this.timeout = setTimeout(() => {
             cpu.loop();
-        }, this.interval - (this.postMs - this.preMs));
+        }, this.interval);
     };
 
+    this.startLoop = function() {
+        this.firstFrame = true;
+        this.loop();
+    }
     this.stopLoop = function() {
+        this.firstFrame = false;
         clearTimeout(this.timeout);
     };
 
@@ -238,11 +262,17 @@ const Cpu = function(nes) {
         this.inNMI = false;
         this.shouldInterrupt = false;
 
-        // Reset cycles
-        this.cpu6502.reset_cycles();
-
-        // Reset 6502
+        // Reset 6502 core
         this.cpu6502.reset();
+    };
+
+    // =============== // Debugging //
+    this.getCurrentPCInCart = function() {
+        var addr = this.pc - 0x8000; // TODO -- its not always gonna be 0x8000 teehee
+        // returns -1 when outside rom
+        if (addr < 0)
+            addr = -1;
+        return addr.toString(16);
     };
     
 };

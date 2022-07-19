@@ -1,4 +1,5 @@
 import constants from '../constants.js';
+import Cartridge from './cartridge.js';
 
 const Mem = function(nes) {
     var mem = this;
@@ -34,12 +35,12 @@ const Mem = function(nes) {
             case 0x16: { // CONTROLLER 1
                 const bit = nes.joypad.pollJoypad();
                 nes.joypad.shiftJoypad();
-                return bit;
+                return bit; // TODO OPENBUS
                 break;
             }
             case 0x17: { // CONTROLLER 2
-                nes.joypad.shiftJoypad();
-                return 0;
+                //nes.joypad.shiftJoypad(); // why was i polling joy1 when this is joy2
+                return 0; // TODO OPENBUS
                 break;
             }
 
@@ -139,36 +140,40 @@ const Mem = function(nes) {
         }
     };
 
-    this.OAMDATAwrite = function(val) {
-        if (nes.ppu.enabled && !nes.ppu.vblankAtm) {
-            // ...
-        }
-        // ... Vblanking (or off)
-        else {
-            this.oam[nes.ppu.oamAddr] = val;
-
-            nes.ppu.oamAddr++;
-            nes.ppu.oamAddr &= 0xff;
-        }
-    };
-
     this.CPUwritePPU = function(addr, val) {
         addr &= 7;
         switch (addr) {
             case 0: { // PPUCTR
+                var preNmiEnabled = nes.ppu.nmiEnabled;
+
                 nes.ppu.tAddr &= 0b0111001111111111;
                 nes.ppu.tAddr |= (val & 3) << 10; // Base nametable addr
 
                 this.ppuAddrInc = ((val & 0x04) !== 0) ? 32 : 1;
                 nes.ppu.spritePatTable = ((val & 0x08) !== 0) ? 0x1000 : 0;
                 nes.ppu.patTable = ((val & 0x10) !== 0) ? 0x1000 : 0;
-                nes.ppu.spriteSize = ((val & 0x20) !== 0) ? 16 : 8;
+                nes.ppu.doubleSprites = ((val & 0x20) !== 0);
+                nes.ppu.spriteSize = 8 + (8 * nes.ppu.doubleSprites);
+                //nes.ppu.spriteSize = ((val & 0x20) !== 0) ? 16 : 8;
                 nes.ppu.masterSelect = (val & 0x40) !== 0;
                 nes.ppu.nmiEnabled = (val & 0x80) !== 0;
+
+                // when NMI requested
+                if (nes.ppu.nmiEnabled && !nes.ppu.considerNmiEnabled) {
+                    nes.ppu.considerNmiEnabled = (!preNmiEnabled && nes.ppu.nmiEnabled);
+                }
+                // when NMI yet to be requested
+                else {
+                    nes.ppu.considerNmiEnabled = nes.ppu.nmiEnabled;
+                }
                 break;
             }
             case 1: { // PPUMASK
                 nes.ppu.enabled = (val & 0b11000) !== 0;
+                // Fill black screen if disabled (THIS IS WRONG)
+                // if (!nes.ppu.enabled) {
+                //     nes.ppu.rendering.clearImg();
+                // }
 
                 nes.ppu.greyscale = (val & 0x01) !== 0;
                 nes.ppu.showBgLeft = (val & 0x02) !== 0;
@@ -233,25 +238,36 @@ const Mem = function(nes) {
         }
     };
 
-    // Cartridge memory access
-    this.readCart = function(addr) {
-        // NROM
-        if (addr < 0x8000) {
-            return 0; // cartram
+    this.OAMDATAwrite = function(val) {
+        if (nes.ppu.enabled && !nes.ppu.vblankAtm) {
+            // ...
         }
+        // ... Vblanking (or off)
         else {
-            return this.rom[addr & (this.romSize-1)]; // rom
+            this.oam[nes.ppu.oamAddr] = val;
+
+            nes.ppu.oamAddr++;
+            nes.ppu.oamAddr &= 0xff;
         }
     };
 
-    this.writeCart = function(addr, val) {
-        // ...
-    };
+    // =============== // Cartridge /Access //
+    this.readCart = function(addr) {};
+    this.writeCart = function(addr, val) {};
+    this.readChr = function(addr) {};
+    this.writeChr = function(addr, val) {};
 
     // =============== // Cartridges //
+    this.cartridge = new Cartridge(nes, this);
+
+    this.mapperId = 0;
     this.romSize = 0;
     this.chrSize = 0;
     this.cartramSize = 0;
+    this.romSizeMask = 0;
+    this.hasChrRam = false;
+    this.chrSizeMask = 0;
+    this.cartramSizeMask = 0;
 
     // Loading cart
     this.loadRomBuff = function(romBuff) {
@@ -272,34 +288,61 @@ const Mem = function(nes) {
         for (var i = 0; i < this.romSize; i++) {
             this.rom[i] = rom[i + constants.ines_headersize];
         }
+
         // load chr
+        if (this.hasChrRam)
+            return;
         for (var i = 0; i < this.chrSize; i++) {
             this.chr[i] = rom[i + constants.ines_headersize + this.romSize];
         }
     };
 
     // Loading mappers
-    this.loadMapper = function(mapperId) {};
+    this.loadMapper = function(mapperId) {
+        if (!this.cartridge.mappers[mapperId])
+            throw `unsupported rom mapper (${mapperId}) !`;
+
+        this.mapperId = mapperId;
+        var mapper = this.cartridge.mappers[mapperId];
+        this.readCart = (addr) => mapper.read(addr);
+        this.writeCart = (addr, val) => mapper.write(addr, val);
+        this.readChr = (addr) => mapper.readChr(addr);
+        this.writeChr = (addr, val) => mapper.writeChr(addr, val);
+    };
 
     this.loadRomProps = function(rom) {
         // iNES magic bytes
         if (rom[0] !== 0x4e || rom[1] !== 0x45 || rom[2] !== 0x53 || rom[3] !== 0x1a)
             throw 'unsupported rom !';
 
-        // We just accepting nrom for now btw
+        // rom
         this.romSize = 0x4000 * rom[4];
-        this.chrSize = 0x2000 * rom[5];
-            nes.ppu.hasChrRam = (rom[5] === 0);
-        this.loadRomIntoMem(rom);
+        // chr
+        if (rom[5] === 0) {
+            this.hasChrRam = true;
+            this.chrSize = 0x4000;
+        }
+        else {
+            this.hasChrRam = false;
+            this.chrSize = 0x2000 * rom[5];
+        }
+        // cart ram
+        this.cartramSize = rom[8] === 0 ? 0x2000 : 0x2000 * rom[8];
+        
+        this.romSizeMask = this.romSize - 1;
+        this.chrSizeMask = this.chrSize - 1;
+        this.cartramSizeMask = this.cartramSize - 1;
 
-        // Nametables
+        // Nametable mirroring
         if (rom[6] & 1) {
+            // vertical
             this.nametable0map = 0;
             this.nametable1map = 1;
             this.nametable2map = 0;
             this.nametable3map = 1;
         }
         else {
+            // horizontal
             this.nametable0map = 0;
             this.nametable1map = 0;
             this.nametable2map = 1;
@@ -307,9 +350,10 @@ const Mem = function(nes) {
         }
 
         // Mappers
-        const mapperId = (rom[6] >> 4) | (rom[7] & 0xf0);
+        var mapperId = (rom[6] >> 4) | (rom[7] & 0xf0);
         console.log('mapper:', mapperId);
 
+        this.loadRomIntoMem(rom);
         this.loadMapper(mapperId);
     };
 
@@ -325,6 +369,10 @@ const Mem = function(nes) {
         this.oam.fill(0);
         this.palleteram.fill(0);
 
+        if (this.hasChrRam) {
+            this.chr.fill(0);
+        }
+
         // IO regs
         for (var i = 0; i < 0x20; i++)
             this.writeIO(i, 0);
@@ -332,11 +380,13 @@ const Mem = function(nes) {
         for (var i = 0; i < 8; i++)
             this.CPUwritePPU(i, 0);
 
-        // reset properties
+        // reset PPU access stuff
+        this.oamLatch = false; // Reset flip-flop
         this.ppuLatch = false; // Reset flip-flop
         this.ppuData = 0;
 
-        this.oamLatch = false; // Reset flip-flop
+        // reset cartridge
+        this.cartridge.reset();
     };
 
 };

@@ -16,6 +16,10 @@ const NES = function() {
     // =============== // Settings //
     this.fps = 60;
     this.setFPS = function(fps) {
+        if (fps > 1000) {
+            fps = 1000;
+        }
+
         this.fps = fps;
         this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / fps;
         this.cpu.interval = 1000 / fps;
@@ -28,6 +32,28 @@ const NES = function() {
         this.setFPS(this.fps); // reset clock speeds
     };
 
+    this.frameskip = false;
+    this.setFrameskip = function(frameskip) {
+        if (frameskip) {
+            if (this.frameskip)
+                return;
+            this.frameskip = true;
+
+            this.cpu.frameskip = true;
+            // Set FPS to 1000, but not actually; this makes it run smoother idek why
+            this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / 1000;
+            this.cpu.interval = 1;
+        }
+        else {
+            if (!this.frameskip)
+                return;
+            this.frameskip = false;
+            this.cpu.frameskip = false;
+
+            this.setFPS(this.fps); // Set FPS back to normal
+        }
+    };
+
     this.canvas = null;
     this.attachCanvas = function(canvas) {
         this.canvas = canvas;
@@ -37,6 +63,7 @@ const NES = function() {
     // Default settings
     this.setPal(false);
     this.setFPS(60);
+    this.setFrameskip(true);
     this.joypad.keyboardAPI.start();
 
     // =============== // Emulation Methods //
@@ -47,7 +74,7 @@ const NES = function() {
         this.paused = false;
 
         // Start components
-        this.cpu.loop();
+        this.cpu.startLoop();
     };
 
     this.stop = function() {
@@ -62,13 +89,29 @@ const NES = function() {
             this.start();
         else
             this.stop();
-    }
+    };
+
+    // dont run when out of browser or unfocused
+    document.addEventListener('visibilitychange', e => {
+        if (document.visibilityState === 'visible') {
+            this.start();
+        }
+        else {
+            this.stop();
+        }
+    });
+    window.addEventListener('blur', e => {
+        this.stop();
+    });
+    window.addEventListener('focus', e => {
+        this.start();
+    });
 
     // Reset Function
     this.reset = function() {
+        this.mem.reset();
         this.cpu.reset();
         this.ppu.reset();
-        this.mem.reset();
         this.joypad.reset();
 
         // Clear screen
@@ -78,6 +121,7 @@ const NES = function() {
 
     this.loadRomBuff = function(rom) {
         this.mem.loadRomBuff(rom);
+        this.reset();
     };
 
     // =============== // Debug Methods //
@@ -90,12 +134,10 @@ const NES = function() {
         win.document.body.innerHTML = '<pre>' + str + '</pre>';
     };
 
-    // Logging
     this.log = '';
     this.popupLog = function() {
         this.popupString(this.log);
     };
-    
 };
 
 export default NES;

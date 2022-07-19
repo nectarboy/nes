@@ -44,12 +44,12 @@ const Joypad = function(nes) {
 
     // =============== // Key Events //
     this.keybinds = {
-        up: 'ArrowUp',
-        down: 'ArrowDown',
-        left: 'ArrowLeft',
-        right: 'ArrowRight',
-        b: 'KeyX',
-        a: 'KeyZ',
+        up: 'KeyW', // 'ArrowUp',
+        down: 'KeyS', // 'ArrowDown',
+        left: 'KeyA', // 'ArrowLeft',
+        right: 'KeyD', // 'ArrowRight',
+        b: 'KeyL', // 'KeyX',
+        a: 'KeyK', // 'KeyZ',
         start: 'Enter',
         select: 'ShiftRight',
 
