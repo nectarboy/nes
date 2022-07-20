@@ -1,6 +1,8 @@
-# pooptendo !
-This is a Nintendo Entertainment System but stuffed inside with horse manure.
-Games may or may not work when you plug them into this pooptendo.
+<p align='center'><img src='https://github.com/nectarboy/nes/blob/main/src/img/pooptendo.png?raw=true'></p>
+<h1 align='center'>Pooptendo</h1>
+
+This is Pooptendo, a Nintendo Entertainment System but stuffed inside with horse manure.
+Games may or may not work when you plug them into this Pooptendo.
 
 Its a big WIP as you can prolly tell ... but some games work !<br>
 [you can try it online :)](https://nectarboy.github.io/nes)
@@ -8,13 +10,13 @@ Its a big WIP as you can prolly tell ... but some games work !<br>
 ## what about it ?
 Pooptendo kinda aims for cycle accuracy; i want most well known (and the fun) games to work, and the final boss is that difficult-to-emulate froggy game >:D
 
-The CPU is made to be cycle accurate, though idk if its 100% correct.<br>
-The PPU is emulated to the pixel level, though it is still being worked on, and i make some sacrifices sometimes for speed.
-If issues show up though, (or if i manage to make it fast enough), ill do my best to make it as accurate as i can !
+The CPU is cycle accurate, but there might be a few bugs lying around.<br>
+The PPU is emulated to the pixel level, though i sometimes make small sacrifices for speed, and there are still some missing stuff.<br>
+If issues show up though, (or if i manage to make it fast enough), i'll do my best to make it as accurate as i can :)
 
-![super fuckin mario](https://github.com/nectarboy/nes/blob/main/pics/Super_Mario_Bros/title.png?raw=true)
-![red panda <3](https://github.com/nectarboy/nes/blob/main/pics/Homebrew/redpanda.png?raw=true)
-![donkey fuck](https://github.com/nectarboy/nes/blob/main/pics/Donkey_Kong/donkey.png?raw=true)
+![super fuckin mario](https://github.com/nectarboy/nes/blob/main/docs/pics/Super_Mario_Bros/title.png?raw=true)
+![red panda <3](https://github.com/nectarboy/nes/blob/main/docs/pics/Homebrew/redpanda.png?raw=true)
+![donkey fuck](https://github.com/nectarboy/nes/blob/main/docs/pics/Mega_Man_2/title.png?raw=true)
 
 ---
 
@@ -44,18 +46,18 @@ These are the default keybinds, they cannot be changed atm soz lol :3
 
 ### progress
 ```
-- cpu           (%80)
+- cpu           (%95)
 - ppu           (%80)
 - cartridge     (%15)
 - apu           (%0)
-- joypad        (%85)
+- joypad        (%90)
 - extra stuff   (%0)
-- cool emu shit (%2)   >:/ HUSH OK HUSH I WILL ADD THEM
+- cool emu shit (%10)
 ```
 
 ---
 
 ### goodbye
-thanks for checking out pooptendo !
+thanks for checking out Pooptendo !
 
-nectarboy - 2021
+nectarboy | 2021-2022

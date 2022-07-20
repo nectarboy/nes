@@ -219,10 +219,21 @@ const Cpu = function(nes) {
                 this.excessMs -= this.interval;
                 this.stepFrame();
             }
+
+            this.timeout = setTimeout(() => {
+                cpu.loop();
+            }, this.interval);
         }
         else {
             this.firstFrame = true;
+
+            this.preMs = performance.now();
             this.stepFrame();
+            this.postMs = performance.now();
+
+            this.timeout = setTimeout(() => {
+                cpu.loop();
+            }, this.interval - 0*(this.postMs - this.preMs));
         }
 
         //nes.ppu.rendering.renderImg(); // Choppy ;_;
@@ -231,10 +242,6 @@ const Cpu = function(nes) {
         //     nes.popupLog();
         //     this.cpu6502.panic();
         // }
-
-        this.timeout = setTimeout(() => {
-            cpu.loop();
-        }, this.interval);
     };
 
     this.startLoop = function() {

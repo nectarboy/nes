@@ -43,6 +43,7 @@ const Joypad = function(nes) {
     };
 
     // =============== // Key Events //
+    // maybe later =w=
     this.keybinds = {
         up: 'KeyW', // 'ArrowUp',
         down: 'KeyS', // 'ArrowDown',
@@ -63,28 +64,28 @@ const Joypad = function(nes) {
             var keybinds = joypad.keybinds;
 
             switch (code) {
-                case keybinds.up:
+                case 'KeyW': case 'ArrowUp':
                     joypad.up = val;
                     break;
-                case keybinds.down:
+                case 'KeyS': case 'ArrowDown':
                     joypad.down = val;
                     break;
-                case keybinds.left:
+                case 'KeyA': case 'ArrowLeft':
                     joypad.left = val;
                     break;
-                case keybinds.right:
+                case 'KeyD': case 'ArrowRight':
                     joypad.right = val;
                     break;
-                case keybinds.b:
+                case 'KeyX': case 'KeyL':
                     joypad.b = val;
                     break;
-                case keybinds.a:
+                case 'KeyZ': case 'KeyK':
                     joypad.a = val;
                     break;
-                case keybinds.start:
+                case 'Enter':
                     joypad.start = val;
                     break;
-                case keybinds.select:
+                case 'ShiftRight':
                     joypad.select = val;
                     break;
 
@@ -99,9 +100,10 @@ const Joypad = function(nes) {
             switch (code) {
                 case joypad.keybinds.debug_reset:
                     nes.reset();
+                    nes.onkeyreset();
                     break;
                 case joypad.keybinds.debug_pause:
-                    nes.togglePause();
+                    nes.onkeypause(nes.togglePause());
                     break;
             }
         },
@@ -111,12 +113,12 @@ const Joypad = function(nes) {
 
         onKeyDown (e) {
             // Check if holding down
-            if (this.pressed [e.keyCode])
-                return e.preventDefault ();
-            this.pressed [e.keyCode] = true;
+            if (this.pressed[e.keyCode])
+                return e.preventDefault();
+            this.pressed[e.keyCode] = true;
 
-            if (this.setKeyState (e.code, true)) {
-                e.preventDefault ();
+            if (this.setKeyState(e.code, true)) {
+                e.preventDefault();
             }
             else {
                 this.checkDebugKey(e.code);
@@ -124,9 +126,10 @@ const Joypad = function(nes) {
         },
 
         onKeyUp (e) {
-            delete this.pressed [e.keyCode]; // Reset pressed keystate
+            if (this.pressed[e.keyCode])
+                this.pressed[e.keyCode] = false;
 
-            this.setKeyState (e.code, false);
+            this.setKeyState(e.code, false);
         },
 
         // Event listeners

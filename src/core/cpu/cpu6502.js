@@ -135,7 +135,7 @@ const Cpu6502 = function(nes, cpu) {
     // =============== // Addressing Modes //
     this.opCycle = 0;
     this.currOp = 0;
-    this.currIns = 0;
+    this.currIns = this.nop_imm; // idk :/
 
     var oper = 0;
     var addr = 0;
@@ -1772,9 +1772,8 @@ const Cpu6502 = function(nes, cpu) {
         if (this.opCycle === -1) {
             // nes.log += this.getLogLine(); // DEBUG LOG
 
-            this.currIns = this.decode(
-                this.currOp = this.fetch()
-            );
+            this.currOp = this.fetch()
+            this.currIns = this.decode(this.currOp);
             this.opCycle++;
 
             return false;

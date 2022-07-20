@@ -1,8 +1,53 @@
-/* SCREEN */
+/* Page */
+html, body {
+    height: 100%;
+    overflow: hidden;
+}
 
-.canvas {
+/* Pooptendo Canvas */
+.CanvasDiv {
+    margin: 0;
+    padding: 0;
+
+    position: relative;
+}
+.PooptendoCanvas {
     width: 512px;
     image-rendering: pixelated;
     
     border: 1px solid black;
+}
+.PooptendoStatus {
+    position: absolute;
+    padding: 8px;
+
+    font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+    /* Style */
+    color: white;
+    font-size: 30px;
+    font-weight: bold;
+
+    -webkit-text-stroke: 1.5px black;
+    text-stroke: 1.5px black;
+
+    bottom: 0;
+    left: 0;
+}
+
+/* Settings */
+.Button {
+    width: 80px;
+    height: 28px;
+    user-select: none;
+}
+.ButtonDiv {
+    position: absolute;
+    top: 0;
+    right: 0;
+}
+
+/* File Select */
+.FileSelect {
+    user-select: none;
 }

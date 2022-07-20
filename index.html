@@ -8,19 +8,38 @@
     <link rel='shortcut icon' href='./src/img/favicon.png' type='image/png'>
 </head>
 <body>
-    <h1>pooptendo :D</h1>
+    <img src='src/img/pooptendo.png' style='border: 1px solid black; position: absolute; bottom: 0; right: 0;'>
+
+    <h1>
+        pooptendo :D
+    </h1>
     <hr>
 
-    <!-- Front elements -->
     <div>
-        <!-- Screen -->
+        <!-- Pooptendo -->
         <div>
-            <canvas id='canvas' class='canvas' width=256 height=240>
-                your browser is garbage. get a new one
-            </canvas>
+            <!-- Canvas -->
+            <div class='CanvasDiv'>
+                <noscript>hey you silly goose! enable JavaScript to play pooptendo silly!</noscript>
+                <canvas id='canvas' class='PooptendoCanvas' width=256 height=240>
+                    hey oldhead! your browser is unsupported. it aint 2008 anymore get a new one smelly 
+                </canvas>
+                <span id='status' class='PooptendoStatus'></span>
+            </div>  
+
+            <!-- Settings -->
+            <div class='ButtonDiv'>
+                <div style='padding: 4px'>
+                    <span><button id='frameskip' class='Button' title='(Turn this off if bad freezing or stuttering)'>Frameskip</button></span>
+                    <span><button id='fullscreen' class='Button' title='Toggle fullscreen'>Fullscreen</button></span>
+                </div>
+            </div>
+
+            <!-- File Select -->
+            <div>
+                <input id='rominput' type='file' class='FileSelect' title='Select a rom :D'>
+            </div>
         </div>
-        <!-- Input -->
-        <input id='file' type='file'>
     </div>
 
     <!-- Front script -->

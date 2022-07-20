@@ -19,10 +19,16 @@ const NES = function() {
         if (fps > 1000) {
             fps = 1000;
         }
-
         this.fps = fps;
-        this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / fps;
-        this.cpu.interval = 1000 / fps;
+
+        if (this.frameskip) {
+            this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / 1000;
+            this.cpu.interval = 1;
+        }
+        else {
+            this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / fps;
+            this.cpu.interval = 1000 / fps;
+        }
     };
 
     this.setPal = function(pal) {
@@ -60,12 +66,6 @@ const NES = function() {
         this.ppu.rendering.initCtx(canvas);
     };
 
-    // Default settings
-    this.setPal(false);
-    this.setFPS(60);
-    this.setFrameskip(true);
-    this.joypad.keyboardAPI.start();
-
     // =============== // Emulation Methods //
     this.paused = true;
     this.start = function() {
@@ -85,10 +85,14 @@ const NES = function() {
     };
 
     this.togglePause = function() {
-        if (this.paused)
+        if (this.paused) {
             this.start();
-        else
+            return true;
+        }
+        else {
             this.stop();
+            return false;
+        }
     };
 
     // dont run when out of browser or unfocused
@@ -115,14 +119,20 @@ const NES = function() {
         this.joypad.reset();
 
         // Clear screen
-        this.ppu.rendering.clearImg();
-        this.ppu.rendering.renderImg();
+        if (this.canvas !== null) {
+            this.ppu.rendering.clearImg();
+            this.ppu.rendering.renderImg();
+        }
     };
 
     this.loadRomBuff = function(rom) {
         this.mem.loadRomBuff(rom);
         this.reset();
     };
+
+    // =============== // Event Latches //
+    this.onkeypause = () => {};
+    this.onkeyreset = () => {};
 
     // =============== // Debug Methods //
     this.getMaxFps = function() {
@@ -138,6 +148,13 @@ const NES = function() {
     this.popupLog = function() {
         this.popupString(this.log);
     };
+
+    // Done :) Apply default settings
+    this.setPal(false);
+    this.setFPS(60);
+    this.setFrameskip(true);
+    this.joypad.keyboardAPI.start();
+    this.reset();
 };
 
 export default NES;
