@@ -55,6 +55,23 @@ These are the default keybinds, they cannot be changed atm soz lol :3
 - cool emu shit (%10)
 ```
 
+### importing
+if you want to import Pooptendo to your site or something, first of all, do credit me ( ͠° ͟ʖ ͡°), second of all, refer:
+```JavaScript
+import NES from './core/nes.js'; // Pooptendo is modular
+
+var nes = new NES();
+nes.attachCanvas(canvas);
+nes.loadRomBuff(romBuff); // A Uint8Array buffer
+nes.start();
+```
+By default, Pooptendo's default settings are:
+- NTSC
+- Joypad Enabled
+- Frameskip Enabled
+
+Refer to `nes.js` in the core to figure out how to set it up to your liking :3
+
 ---
 
 ### goodbye
