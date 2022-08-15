@@ -1,0 +1,20 @@
+CPU:
+- BRK is bugged (according to blarg instr_test v5)
+- CPU timings are off (blarg instr_timing)
+PPU:
+- sprites overflow from bottom of screen to first scanline
+possible culprit: prerender scanline being hardcoded as -1
+
+-----------------------------------------
+SUPER MARIO BROS: death jingle is flat (no sweep)
+possible culprit: I DONT KNOW ;-;
+
+TETRIS: '0' characters are a lil bit corrupted for some reason
+possible culprit: MMC1, possibly smth with pages
+
+DOUBLE DRAGON: the intro with the girl getting kidnapped flickers with the menu bar going up
+possible culprit: ??? idk ??? maybe sprite 0 ?
+
+-----------------------------------------
+if you see any bugs, please open an issue on the github !
+(github.com/nectarboy/nes)

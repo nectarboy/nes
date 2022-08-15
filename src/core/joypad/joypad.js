@@ -1,5 +1,6 @@
 // Copied some code over from the gameboy emu
 // uwu
+// TODO: eliminate ghost input :)
 
 import constants from '../constants.js';
 
@@ -60,32 +61,30 @@ const Joypad = function(nes) {
 
     this.keyboardAPI = {
         // Key state handlers
-        setKeyState (code, val) {
-            var keybinds = joypad.keybinds;
-
-            switch (code) {
-                case 'KeyW': case 'ArrowUp':
+        setKeyState (keycode, val) {
+            switch (keycode) {
+                case 87: case 38:
                     joypad.up = val;
                     break;
-                case 'KeyS': case 'ArrowDown':
+                case 83: case 40:
                     joypad.down = val;
                     break;
-                case 'KeyA': case 'ArrowLeft':
+                case 65: case 37:
                     joypad.left = val;
                     break;
-                case 'KeyD': case 'ArrowRight':
+                case 68: case 39:
                     joypad.right = val;
                     break;
-                case 'KeyX': case 'KeyL':
+                case 88: case 76:
                     joypad.b = val;
                     break;
-                case 'KeyZ': case 'KeyK':
+                case 90: case 75:
                     joypad.a = val;
                     break;
-                case 'Enter':
+                case 13:
                     joypad.start = val;
                     break;
-                case 'ShiftRight':
+                case 16:
                     joypad.select = val;
                     break;
 
@@ -109,15 +108,17 @@ const Joypad = function(nes) {
         },
 
         // Keypress handlers
-        pressed: {},
+        pressed: new Uint8Array(256),
 
         onKeyDown (e) {
             // Check if holding down
-            if (this.pressed[e.keyCode])
-                return e.preventDefault();
-            this.pressed[e.keyCode] = true;
+            if (this.pressed[e.keyCode] === 1) {
+                e.preventDefault();
+                return;
+            }
+            this.pressed[e.keyCode] = 1;
 
-            if (this.setKeyState(e.code, true)) {
+            if (this.setKeyState(e.keyCode, true)) {
                 e.preventDefault();
             }
             else {
@@ -126,10 +127,8 @@ const Joypad = function(nes) {
         },
 
         onKeyUp (e) {
-            if (this.pressed[e.keyCode])
-                this.pressed[e.keyCode] = false;
-
-            this.setKeyState(e.code, false);
+            this.pressed[e.keyCode] = 0;
+            this.setKeyState(e.keyCode, false);
         },
 
         // Event listeners

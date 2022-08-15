@@ -30,15 +30,21 @@ const Mem = function(nes) {
 
     // =============== // IO Accesses //
     this.readIO = function(addr) {
-        addr &= 0x1f;
         switch (addr) {
-            case 0x16: { // CONTROLLER 1
+            case 0x4015: { // APU CHANNEL STATUS
+                return (
+                    (nes.apu.sq2.lengthplaying << 1) |
+                    (nes.apu.sq1.lengthplaying)
+                );
+                break;
+            }
+            case 0x4016: { // CONTROLLER 1
                 const bit = nes.joypad.pollJoypad();
                 nes.joypad.shiftJoypad();
                 return bit; // TODO OPENBUS
                 break;
             }
-            case 0x17: { // CONTROLLER 2
+            case 0x4017: { // CONTROLLER 2
                 //nes.joypad.shiftJoypad(); // why was i polling joy1 when this is joy2
                 return 0; // TODO OPENBUS
                 break;
@@ -52,9 +58,94 @@ const Mem = function(nes) {
     };
 
     this.writeIO = function(addr, val) {
-        addr &= 0x1f;
         switch (addr) {
-            case 0x14: { // OAMDMA
+            // ---- SQUARE CHANNEL 1
+            case 0x4000: { // ENVELOPE
+                nes.apu.sq1.duty = val >> 6;
+                nes.apu.sq1.loopvol = (val & 0x20) !== 0;
+                nes.apu.sq1.constantvol = (val & 0x10) !== 0;
+                nes.apu.sq1.volreload = val & 0xf;
+
+                // update sq1 volume
+                nes.apu.sq1.vol = (nes.apu.sq1.constantvol ? nes.apu.sq1.volreload : nes.apu.sq1.envvol) / 15;
+                nes.apu.sq1.calcMasterVol();
+                break;
+            }
+            case 0x4001: { // SWEEP
+                nes.apu.sq1.sweepenabled = (val & 0x80) !== 0;
+                nes.apu.sq1.sweepdivreload = (val >> 4) & 0x7;
+                nes.apu.sq1.sweepneg = (val & 0x8) !== 0;
+                nes.apu.sq1.sweepshift = val & 0x7;
+
+                // Set reload flag
+                nes.apu.sq1.sweepstart = true;
+                break;
+            }
+            case 0x4002: { // FREQ LO
+                nes.apu.sq1.freqreload &= 0x700;
+                nes.apu.sq1.freqreload |= val;
+
+                nes.apu.sq1.updateSweepTarget();
+                break;
+            }
+            case 0x4003: { // FREQ HI + LENGTH
+                nes.apu.sq1.writeLength(val >> 3);
+
+                nes.apu.sq1.freqreload &= 0xff;
+                nes.apu.sq1.freqreload |= (val & 7) << 8;
+
+                nes.apu.sq1.updateSweepTarget();
+
+                // Side effects
+                nes.apu.sq1.volstart = true;
+                nes.apu.sq1.dutystep = 0;
+                break;
+            }
+
+            // ---- SQUARE CHANNEL 2
+            case 0x4004: { // ENVELOPE
+                nes.apu.sq2.duty = val >> 6;
+                nes.apu.sq2.loopvol = (val & 0x20) !== 0;
+                nes.apu.sq2.constantvol = (val & 0x10) !== 0;
+                nes.apu.sq2.volreload = val & 0xf;
+
+                // update sq2 volume
+                nes.apu.sq2.vol = (nes.apu.sq2.constantvol ? nes.apu.sq2.volreload : nes.apu.sq2.envvol) / 15;
+                nes.apu.sq2.calcMasterVol();
+                break;
+            }
+            case 0x4005: { // SWEEP
+                nes.apu.sq2.sweepenabled = (val & 0x80) !== 0;
+                nes.apu.sq2.sweepdivreload = (val >> 4) & 0x7;
+                nes.apu.sq2.sweepneg = (val & 0x8) !== 0;
+                nes.apu.sq2.sweepshift = val & 0x7;
+
+                // Set reload flag
+                nes.apu.sq2.sweepstart = true;
+                break;
+            }
+            case 0x4006: { // FREQ LO
+                nes.apu.sq2.freqreload &= 0x700;
+                nes.apu.sq2.freqreload |= val;
+
+                nes.apu.sq2.updateSweepTarget();
+                break;
+            }
+            case 0x4007: { // FREQ HI + LENGTH
+                nes.apu.sq2.writeLength(val >> 3);
+
+                nes.apu.sq2.freqreload &= 0xff;
+                nes.apu.sq2.freqreload |= (val & 7) << 8;
+
+                nes.apu.sq2.updateSweepTarget();
+
+                // Side effects
+                nes.apu.sq2.volstart = true;
+                nes.apu.sq2.dutystep = 0;
+                break;
+            }
+
+            case 0x4014: { // OAMDMA
                 // Hacky DMA ,,, only for now ok u_u
                 var cpuAddr = val << 8;
                 for (var i = 0; i < 0x100; i++) {
@@ -63,11 +154,40 @@ const Mem = function(nes) {
                 }
                 break;
             }
-            case 0x16: { // CONTROLLER 1
+
+            case 0x4015: { // APU CHANNEL STATUS
+                if ((val & 0x1) === 0) {
+                    nes.apu.sq1.silence();
+                }
+                else
+                    nes.apu.sq1.enable();
+
+                if ((val & 0x2) === 0)
+                    nes.apu.sq2.silence();
+                else
+                    nes.apu.sq2.enable();
+                break;
+            }
+
+            case 0x4016: { // CONTROLLER 1
                 nes.joypad.strobe = (1&val) !== 0;
                 if (nes.joypad.strobe) {
                     nes.joypad.shift = 0;
                 }
+                break;
+            }
+
+            case 0x4017: { // FRAME COUNTER
+                nes.apu.fcIrqEnabled = (val & 0x10) !== 0;
+                nes.apu.fcmode = (val & 0x80) !== 0;
+
+                // Reset tick and step
+                nes.apu.fctick = 0;
+                nes.apu.fcsteptick = 0;
+
+                // Generate half and quarter signal
+                if (nes.apu.fcmode)
+                    nes.apu.fcgensignal = 2;
                 break;
             }
         }
@@ -240,7 +360,7 @@ const Mem = function(nes) {
 
     this.OAMDATAwrite = function(val) {
         if (nes.ppu.enabled && !nes.ppu.vblankAtm) {
-            // ...
+            // TODO (?)
         }
         // ... Vblanking (or off)
         else {
@@ -374,7 +494,7 @@ const Mem = function(nes) {
         }
 
         // IO regs
-        for (var i = 0; i < 0x20; i++)
+        for (var i = 0x4000; i < 0x4020; i++)
             this.writeIO(i, 0);
         // PPU regs
         for (var i = 0; i < 8; i++)

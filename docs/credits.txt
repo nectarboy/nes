@@ -1,0 +1,8 @@
+2021 - 2022
+
+author: github.com/nectarboy
+
+resources:
+ -nesdev wiki (for like 80% of everything)
+ -https://www.masswerk.at/6502/6502_instruction_set.html
+ -emudev discord (helps me fix bugs :) [https://discord.gg/dkmJAes]

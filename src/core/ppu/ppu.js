@@ -9,6 +9,8 @@ const Ppu = function(nes) {
     this.rendering = rendering;
 
     // =============== // Reading and Writing //
+    // TODO: make seperate read functions for each block SO THAT when the ppu reads data and whatnot
+    // it doesnt need to go through all these fuckin if statements every time so performance go weeeee
     this.read = function(addr) {
         if (addr < 0x2000) {
             return mem.readChr(addr); // 8KB addressable CHR
@@ -189,26 +191,17 @@ const Ppu = function(nes) {
             }
 
             var lx = this.cycles - 1;
+            var shouldDraw = (lx < 256);
 
             // Rendering
             if (this.enabled) {
                 // Fetch tile data ahead
-                const shouldDraw = (lx < 256);
                 if (shouldDraw && (lx & 7) === 0) {
                     this.fetchBgAhead();
                     this.incCoarseX();
                     this.fetchSpriteAhead();
                 }
 
-                // Fetch and render current pixel
-                if (shouldDraw && !this.preRender) {
-                    //this.spriteEval(); // An accurate method (???)
-
-                    var px = this.getBgPixel(lx);
-                    px = this.getSpritePixel(lx, px);
-
-                    this.rendering.drawPx(lx, this.ly, px);
-                }
                 // Update PPU addr for next scanline
                 else if (lx === 256) {
                     this.incAllY();
@@ -235,6 +228,17 @@ const Ppu = function(nes) {
                     this.fetchBgAhead();
                     this.incCoarseX();
                 }
+            }
+
+            // Fetch and render current pixel
+            if (shouldDraw && !this.preRender) {
+                //this.spriteEval(); // An accurate method (???)
+
+                var px = this.getBgPixel(lx);
+                if (this.spritesEnabled)
+                    px = this.getSpritePixel(lx, px);
+
+                this.rendering.drawPx(lx, this.ly, px);
             }
 
             // End of scanline ...
@@ -391,9 +395,6 @@ const Ppu = function(nes) {
 
     // Sprite rendering
     this.getSpritePixel = function(lx, px) {
-        if (!this.spritesEnabled)
-            return px;
-
         for (var i = 0; i < this.spritesThisLine; i++) {
             const oami = i * 4;
 

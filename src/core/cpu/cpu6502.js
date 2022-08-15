@@ -135,7 +135,7 @@ const Cpu6502 = function(nes, cpu) {
     // =============== // Addressing Modes //
     this.opCycle = 0;
     this.currOp = 0;
-    this.currIns = this.nop_imm; // idk :/
+    this.currIns = this.nop; // idk :/
 
     var oper = 0;
     var addr = 0;
@@ -509,15 +509,11 @@ const Cpu6502 = function(nes, cpu) {
         this.branch(!cpu.p_n);
     };
 
-    // ----- BRK
+    // ----- BRK (FIXME)
     this.brk = function() {
         switch (this.opCycle) {
             case 1:
-                cpu.pc++;
-                cpu.pc &= 0xffff;
-
-                cpu.p_b = true;
-                //cpu.p_i = true;
+                this.fetch(); // dummy fetch
                 break;
             case 2:
                 cpu.push(cpu.pc >> 8);
@@ -529,10 +525,10 @@ const Cpu6502 = function(nes, cpu) {
                 cpu.push(cpu.getP());
                 break;
             case 5:
-                // Expend cycle
+                cpu.pc = cpu.read(0xfffe);
                 break;
             case 6:
-                cpu.pc = cpu.read16(0xfffe);
+                cpu.pc |= cpu.read(0xffff) << 8;
                 this.reset_cycles();
                 break;
         }
@@ -1764,6 +1760,8 @@ const Cpu6502 = function(nes, cpu) {
 
             default:
                 return this.nop;
+                // alert('ILLEGAL OP:', op.toString(16));
+                // throw ('ILLEGAL OP: ' + op.toString(16));
         }
     };
 
@@ -1772,7 +1770,7 @@ const Cpu6502 = function(nes, cpu) {
         if (this.opCycle === -1) {
             // nes.log += this.getLogLine(); // DEBUG LOG
 
-            this.currOp = this.fetch()
+            this.currOp = this.fetch();
             this.currIns = this.decode(this.currOp);
             this.opCycle++;
 

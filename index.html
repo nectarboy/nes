@@ -22,7 +22,7 @@
             <div class='CanvasDiv'>
                 <noscript>hey you silly goose! enable JavaScript to play pooptendo silly!</noscript>
                 <canvas id='canvas' class='PooptendoCanvas' width=256 height=240>
-                    hey oldhead! your browser is unsupported. it aint 2008 anymore get a new one smelly 
+                    hey oldhead! your browser is unsupported. anymore get a new one u geezer 
                 </canvas>
                 <span id='status' class='PooptendoStatus'></span>
             </div>  
@@ -30,8 +30,12 @@
             <!-- Settings -->
             <div class='ButtonDiv'>
                 <div style='padding: 4px'>
-                    <span><button id='frameskip' class='Button' title='(Turn this off if bad freezing or stuttering)'>Frameskip</button></span>
-                    <span><button id='fullscreen' class='Button' title='Toggle fullscreen'>Fullscreen</button></span>
+                    <div id='settingsdiv' style='display: inline;'>
+                        <!-- <button id='choppy' class='Button' title='[DEBUG] Runs at 10 FPS'>CHOPPY</button> -->
+                        <button id='frameskip' class='Button' title='(Turn this off if bad freezing or stuttering)'>Frameskip</button>
+                        <button id='fullscreen' class='Button' title='Toggle fullscreen'>Fullscreen</button>
+                    </div>
+                    <span><button id='minimize' class='SmallButton'><</button></span>
                 </div>
             </div>
 

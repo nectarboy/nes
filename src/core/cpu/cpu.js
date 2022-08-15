@@ -179,6 +179,7 @@ const Cpu = function(nes) {
             }
 
             nes.ppu.execute();
+            nes.apu.execute();
 
             cycles--;
         }
@@ -190,6 +191,17 @@ const Cpu = function(nes) {
     };
 
     // =============== // Loop //
+    // TODO: try to improve looping later on cuz it is pretty experimental
+    if (window.requestAnimationFrame) {
+        this.reqLoop = function() {this.timeout = requestAnimationFrame(() => {cpu.loop();});};
+        this.cancelLoop = function() {cancelAnimationFrame(this.timeout);};
+    }
+    else {
+        var interval = 1000 / 60;
+        this.reqLoop = function(excess) {this.timeout = setTimeout(() => {cpu.loop();}, interval-excess);};
+        this.cancelLoop = function() {clearTimeout(this.timeout);};
+    }
+
     this.interval = 0;
     this.timeout = null;
 
@@ -197,6 +209,7 @@ const Cpu = function(nes) {
     this.postMs = 0;
     this.excessMs = 0;
     this.frameskip = false; // Pooptendo will try its best to run at full speed
+    this.frameskipcooldown = false; // When this is flagged, will switch frameskip on and off to regulate it
     this.firstFrame = false;
     this.framesElapsed = 0;
 
@@ -206,34 +219,48 @@ const Cpu = function(nes) {
         if (this.frameskip) {
             if (this.firstFrame) {
                 this.firstFrame = false;
-                this.preMs = performance.now();
+                this.preMs = performance.now() - this.interval;
             }
             else {
                 this.preMs = this.postMs;
             }
 
             this.postMs = performance.now();
-            this.excessMs += this.postMs - this.preMs;
+            // this.excessMs += this.postMs - this.preMs;
 
-            while (this.excessMs >= 0) {
-                this.excessMs -= this.interval;
-                this.stepFrame();
-            }
+            // while (this.excessMs >= 0) {
+            //     this.excessMs -= this.interval;
+            //     this.stepFrame();
+            // }
 
-            this.timeout = setTimeout(() => {
-                cpu.loop();
-            }, this.interval);
+            this.excessMs = this.postMs - this.preMs;
+            var ratio = (this.excessMs / this.interval)
+
+            var pre = performance.now();
+            this.stepNES(this.cyclesPerFrame * ratio);
+            var post = performance.now();
+
+            // if (ratio > 2.5) {
+            //     console.log('OVERLOAD; COOLING DOWN', ratio.toFixed(2));
+            //     // nes.setFrameskip(false);
+            //     // this.frameskipcooldown = true;
+            // }
+
+            this.reqLoop(post - pre);
         }
         else {
             this.firstFrame = true;
 
-            this.preMs = performance.now();
+            var pre = performance.now();
             this.stepFrame();
-            this.postMs = performance.now();
+            var post = performance.now();
 
-            this.timeout = setTimeout(() => {
-                cpu.loop();
-            }, this.interval - 0*(this.postMs - this.preMs));
+            // if (this.frameskipcooldown) {
+            //     this.frameskipcooldown = true;
+            //     nes.setFrameskip(true);
+            // }
+
+            this.reqLoop(post - pre);
         }
 
         //nes.ppu.rendering.renderImg(); // Choppy ;_;
@@ -250,7 +277,7 @@ const Cpu = function(nes) {
     }
     this.stopLoop = function() {
         this.firstFrame = false;
-        clearTimeout(this.timeout);
+        this.cancelLoop();
     };
 
     // =============== // Bootstrapping //
@@ -285,3 +312,16 @@ const Cpu = function(nes) {
 };
 
 export default Cpu;
+//     _____
+//    / 6c  \
+//   |(·c·)  |  charles brownington
+//  <|  _    |>
+//    \_____/
+//     /|_|\
+//    |     |
+//    |   |_|
+//    |\/\| |
+//    |___|_/
+//    |_|__|
+//     ||_|
+//    [_[__|

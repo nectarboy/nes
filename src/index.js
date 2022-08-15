@@ -1,11 +1,16 @@
 import NES from './core/nes.js';
 
+window.onload = function() {
+
 // Html
 const canvas = document.getElementById('canvas');
+const settingsdiv = document.getElementById('settingsdiv');
 const rominput = document.getElementById('rominput');
 const fullscreen = document.getElementById('fullscreen');
 const frameskip = document.getElementById('frameskip');
-const status = document.getElementById('status')
+// const choppy = document.getElementById('choppy');
+const minimize = document.getElementById('minimize');
+const status = document.getElementById('status');
 
 // Nes
 const nes = new NES(); // Ready to use :3
@@ -38,7 +43,7 @@ fullscreen.onclick = function() {
         isfullscreen = true;
         canvas.style.width = '100%';
         canvas.style.height = '100%';
-        canvas.style.position = 'absolute';
+        canvas.style.position = 'fixed';
         canvas.style.top = '0';
         canvas.style.left = '0';
     }
@@ -56,6 +61,29 @@ frameskip.onclick = function() {
         isframeskip = true;
         nes.setFrameskip(true);
         setStatus('Frameskip Enabled!', 0);
+    }
+};
+
+// Choppy Mode
+// choppy.onclick = function() {
+//     nes.setFrameskip(false);
+//     isframeskip = false;
+//     nes.setFPS(10);
+//     setStatus('CHOPPY MODE', 0);
+// };
+
+// Minimizing Settings
+var isminimized = false;
+minimize.onclick = function() {
+    if (isminimized) {
+        isminimized = false;
+        minimize.innerHTML = '<';
+        settingsdiv.style.display = 'inline';
+    }
+    else {
+        isminimized = true;
+        minimize.innerHTML = 'v';
+        settingsdiv.style.display = 'none';
     }
 };
 
@@ -91,7 +119,16 @@ function readFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
+// Splash screen
+const splashimg = new Image();
+splashimg.onload = function() {
+    canvas.getContext('2d').drawImage(splashimg,0,0,256,256);
+};
+splashimg.src = 'src/img/splash0.png';
+
 // Done :)
 setStatus('Its pooptendin\' time', 1);
-
 console.log(nes);
+scrollTo(0,0); // actually annoying bug
+
+};

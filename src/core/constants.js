@@ -3,8 +3,8 @@ const constants = {
     screen_height: 240,
 
     // NES clocks
-    clocks_ntsc: 1786840,
-    clocks_pal: 0, // ???
+    clocks_ntsc: 1789773, // TODO: check if accurate ~ // 1786840
+    clocks_pal: 1662607, // ~
 
     ppu_cyclespervblank: 19 * 341,
 

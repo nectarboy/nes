@@ -33,6 +33,8 @@ const Cartridge = function(nes, mem) {
         }
     };
 
+    // TODO: optimize reads n shit
+    // idk how just do it
     this.mappers[1] = {
         shiftreg: 0,
 

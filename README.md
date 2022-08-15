@@ -28,16 +28,21 @@ POOPTENDO STATUS :: horse manure is beginning to clear out
 Pooptendo is being written in JS atm, however, i wanna remake it in C sometime !
 (i hope i dont give up on that TwT)
 
-### controller
+### how to use
+Click <kbd>Choose File</kbd>to insert a ROM.
+
+<kbd>Fullscreen</kbd> toggles fullscreen,
+<br><kbd>Frameskip</kbd> toggles frameskip.
+
 ```
 -- nes joypad
-D-PAD   - ARROW KEYS
-B       - X
-A       - Z
+D-PAD   - ARROW KEYS / WASD
+B       - X / L
+A       - Z / K
 START   - ENTER
-SELECT  - RIGHT-SHIFT
+SELECT  - SHIFT
 
--- emulator buttons
+-- emulator shortcuts
 RESET   - R
 PAUSE   - P
 ```
@@ -47,16 +52,16 @@ These are the default keybinds, they cannot be changed atm soz lol :3
 ### progress
 ```
 - cpu           (%95)
-- ppu           (%80)
+- ppu           (%90)
 - cartridge     (%15)
-- apu           (%0)
+- apu           (%25)
 - joypad        (%90)
 - extra stuff   (%0)
 - cool emu shit (%10)
 ```
 
 ### importing
-if you want to import Pooptendo to your site or something, first of all, do credit me ( ͠° ͟ʖ ͡°), second of all, refer:
+if you want to import Pooptendo to your site or something, first of all pls credit me :3, second of all:
 ```JavaScript
 import NES from './core/nes.js'; // Pooptendo is modular
 

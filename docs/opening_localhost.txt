@@ -1,0 +1,7 @@
+because pooptendo is modular, it doesnt work as a file alone
+
+currently for Windows there is a local.bat and local.py that hosts a localhost server at port 8000
+
+and you need to have Python installed
+
+it should be pizz easy to make one for Mac in the future but im too lazy so yea

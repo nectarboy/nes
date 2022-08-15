@@ -1,6 +1,7 @@
 import constants from './constants.js';
 import Cpu from './cpu/cpu.js';
 import Ppu from './ppu/ppu.js';
+import Apu from './apu/apu.js';
 import Mem from './mem/mem.js';
 import Joypad from './joypad/joypad.js';
 
@@ -11,31 +12,34 @@ const NES = function() {
     this.mem = new Mem(this);
     this.cpu = new Cpu(this);
     this.ppu = new Ppu(this);
+    this.apu = new Apu(this);
     this.joypad = new Joypad(this);
 
     // =============== // Settings //
-    this.fps = 60;
-    this.setFPS = function(fps) {
-        if (fps > 1000) {
-            fps = 1000;
-        }
-        this.fps = fps;
+    this.resetFPS = function() {
+        const fps = 60;
 
-        if (this.frameskip) {
-            this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / 1000;
-            this.cpu.interval = 1;
-        }
-        else {
-            this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / fps;
-            this.cpu.interval = 1000 / fps;
-        }
+        this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / fps;
+        this.cpu.interval = 1000 / fps;
+        // if (this.frameskip) {
+        //     this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / 1000;
+        //     this.cpu.interval = 1;
+        // }
+        // else {
+        //     this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / fps;
+        //     this.cpu.interval = 1000 / fps;
+        // }
+
+        this.apu.calcFcIntervals(); // frame counter
     };
 
     this.setPal = function(pal) {
         this.cpu.isPal = pal;
         this.cpu.cyclesPerSec = pal ? constants.clocks_pal : constants.clocks_ntsc;
 
-        this.setFPS(this.fps); // reset clock speeds
+        this.resetFPS(); // reset clock speeds
+        this.apu.updateBuffInterval();
+        this.apu.calcFcIntervals(); // frame counter
     };
 
     this.frameskip = false;
@@ -47,8 +51,8 @@ const NES = function() {
 
             this.cpu.frameskip = true;
             // Set FPS to 1000, but not actually; this makes it run smoother idek why
-            this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / 1000;
-            this.cpu.interval = 1;
+            // this.cpu.cyclesPerFrame = (this.cpu.cyclesPerSec) / 1000;
+            // this.cpu.interval = 1;
         }
         else {
             if (!this.frameskip)
@@ -56,7 +60,7 @@ const NES = function() {
             this.frameskip = false;
             this.cpu.frameskip = false;
 
-            this.setFPS(this.fps); // Set FPS back to normal
+            // this.setFPS(this.fps); // Set FPS back to normal
         }
     };
 
@@ -78,6 +82,8 @@ const NES = function() {
     };
 
     this.stop = function() {
+        if (this.paused)
+            return;
         this.paused = true;
 
         // Stop components
@@ -96,19 +102,18 @@ const NES = function() {
     };
 
     // dont run when out of browser or unfocused
+    var browservisibilitypaused = true;
     document.addEventListener('visibilitychange', e => {
         if (document.visibilityState === 'visible') {
-            this.start();
+            if (!browservisibilitypaused)
+                this.start();
+            console.log('unhidden', browservisibilitypaused);
         }
         else {
+            browservisibilitypaused = this.paused;
             this.stop();
+            console.log('hidden', browservisibilitypaused);
         }
-    });
-    window.addEventListener('blur', e => {
-        this.stop();
-    });
-    window.addEventListener('focus', e => {
-        this.start();
     });
 
     // Reset Function
@@ -116,6 +121,7 @@ const NES = function() {
         this.mem.reset();
         this.cpu.reset();
         this.ppu.reset();
+        this.apu.reset();
         this.joypad.reset();
 
         // Clear screen
@@ -151,8 +157,9 @@ const NES = function() {
 
     // Done :) Apply default settings
     this.setPal(false);
-    this.setFPS(60);
+    this.resetFPS();
     this.setFrameskip(true);
+    this.apu.generateBuffer(4096, 48000);
     this.joypad.keyboardAPI.start();
     this.reset();
 };

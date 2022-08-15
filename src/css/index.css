@@ -41,6 +41,11 @@ html, body {
     height: 28px;
     user-select: none;
 }
+.SmallButton {
+    width: 32px;
+    height: 28px;
+    user-select: none;
+}
 .ButtonDiv {
     position: absolute;
     top: 0;
