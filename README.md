@@ -20,7 +20,7 @@ If issues show up though, (or if i manage to make it fast enough), i'll do my be
 
 ![super fuckin mario](https://github.com/nectarboy/nes/blob/main/docs/pics/Tetris/stack.png?raw=true)
 ![red panda <3](https://github.com/nectarboy/nes/blob/main/docs/pics/Kirbys_Adventure/crane.png?raw=true)
-![donkey fuck](https://github.com/nectarboy/nes/blob/main/docs/pics/River_City_Ransom/title.png?raw=true)
+![donkey fuck](https://github.com/nectarboy/nes/blob/main/docs/pics/River_City_Ransom/sushi.png?raw=true)
 
 ---
 
