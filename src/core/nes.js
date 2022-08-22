@@ -107,12 +107,12 @@ const NES = function() {
         if (document.visibilityState === 'visible') {
             if (!browservisibilitypaused)
                 this.start();
-            console.log('unhidden', browservisibilitypaused);
+            //console.log('unhidden', browservisibilitypaused); // THIS IS SO ANNOYING WHY DID I KEEP THIS SO LONG
         }
         else {
             browservisibilitypaused = this.paused;
             this.stop();
-            console.log('hidden', browservisibilitypaused);
+            //console.log('hidden', browservisibilitypaused);
         }
     });
 

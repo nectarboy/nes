@@ -11,7 +11,7 @@ function Apu(nes) {
     this.ctx = new (window.AudioContext || window.webkitAudioContext)(); // listening to grouper while doing this harharhar (my will to live is dwindling)
 
     this.gainNode = this.ctx.createGain();
-    this.gainNode.gain.value = 0.05;
+    this.gainNode.gain.value = 0.25;
     this.gainNode.connect(this.ctx.destination);
 
     this.currentBuff = 0;
@@ -156,21 +156,22 @@ function Apu(nes) {
                 this.calcMasterVol();
             },
             updateSweep() {
-                this.updateSweepTarget();
+                //this.updateSweepTarget();
 
                 // Updating raw frequency
-                if (this.sweepstart) {
-                    this.sweepstart = false;
-                    this.sweepdiv = this.sweepdivreload;
-                }
-                else if (this.sweepdiv <= 0) {
-                    this.sweepdiv = this.sweepdivreload;
+                if (this.sweepdiv === 0) {
+                    this.sweepstart = true;
 
                     this.updateSweepTarget();
                     if (this.sweepenabled && this.sweepplaying === 1) {
                         this.freqreload = this.sweeptarget;
                         this.updateSweepTarget();
                     }
+                }
+                
+                if (this.sweepstart) {
+                    this.sweepstart = false;
+                    this.sweepdiv = this.sweepdivreload;
                 }
                 else {
                     this.sweepdiv--;
@@ -305,6 +306,7 @@ function Apu(nes) {
                 }
                 case 11185: {
                     this.quarterFrame();
+                    //this.halfFrame();
                     break;
                 }
                 case 18640: {

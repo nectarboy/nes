@@ -73,7 +73,7 @@ const Cpu = function(nes) {
         }
         // Cartridge
         else {
-            return nes.mem.readCart(addr);
+            return nes.mem.mapper.read(addr);
         }
     };
 
@@ -96,7 +96,7 @@ const Cpu = function(nes) {
         }
         // Cartridge
         else {
-            nes.mem.writeCart(addr, val);
+            nes.mem.mapper.write(addr, val);
         }
     };
 

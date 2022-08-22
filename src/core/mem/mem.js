@@ -15,6 +15,7 @@ const Mem = function(nes) {
         new Uint8Array(32 * 32)  // D
     ];
 
+    this.nametable4screen = false;
     this.nametable0map = 0;
     this.nametable1map = 0;
     this.nametable2map = 0;
@@ -24,6 +25,7 @@ const Mem = function(nes) {
     this.palleteram = new Uint8Array(0x20);
 
     // cartridge
+    this.rawfilerom = new Uint8Array(0);
     this.rom = new Uint8Array(0);
     this.chr = new Uint8Array(0);
     this.cartram = new Uint8Array(0);
@@ -77,6 +79,8 @@ const Mem = function(nes) {
                 nes.apu.sq1.sweepneg = (val & 0x8) !== 0;
                 nes.apu.sq1.sweepshift = val & 0x7;
 
+                nes.apu.sq1.updateSweepTarget();     
+
                 // Set reload flag
                 nes.apu.sq1.sweepstart = true;
                 break;
@@ -119,6 +123,8 @@ const Mem = function(nes) {
                 nes.apu.sq2.sweepdivreload = (val >> 4) & 0x7;
                 nes.apu.sq2.sweepneg = (val & 0x8) !== 0;
                 nes.apu.sq2.sweepshift = val & 0x7;
+
+                nes.apu.sq2.updateSweepTarget();
 
                 // Set reload flag
                 nes.apu.sq2.sweepstart = true;
@@ -216,6 +222,9 @@ const Mem = function(nes) {
                     (nes.ppu.sprite0Atm << 6)
                     | (nes.ppu.vblankFlag << 7)
                 );
+
+                // if (nes.ppu.sprite0Atm)
+                //     console.log(nes.ppu.ly);
 
                 nes.ppu.vblankFlag = false;
                 this.ppuLatch = false; // Reset latch
@@ -371,15 +380,10 @@ const Mem = function(nes) {
         }
     };
 
-    // =============== // Cartridge /Access //
-    this.readCart = function(addr) {};
-    this.writeCart = function(addr, val) {};
-    this.readChr = function(addr) {};
-    this.writeChr = function(addr, val) {};
-
     // =============== // Cartridges //
     this.cartridge = new Cartridge(nes, this);
 
+    this.mapper = {};
     this.mapperId = 0;
     this.romSize = 0;
     this.chrSize = 0;
@@ -391,14 +395,18 @@ const Mem = function(nes) {
 
     // Loading cart
     this.loadRomBuff = function(romBuff) {
-        if (typeof romBuff !== 'object')
-            throw 'this is not a rom !';
+        if (typeof romBuff !== 'object') {
+            throw 'This is not a ROM!';
+            return;
+        }
 
         var rom = new Uint8Array(romBuff);
         this.loadRomProps(rom);
     };
 
     this.loadRomIntoMem = function(rom) {
+        this.rawfilerom = rom;
+
         // If no errors have occured in loadRomProps, we should be good to go !
         this.rom = new Uint8Array(this.romSize);
         this.chr = new Uint8Array(this.chrSize);
@@ -419,21 +427,30 @@ const Mem = function(nes) {
 
     // Loading mappers
     this.loadMapper = function(mapperId) {
-        if (!this.cartridge.mappers[mapperId])
-            throw `unsupported rom mapper (${mapperId}) !`;
 
         this.mapperId = mapperId;
-        var mapper = this.cartridge.mappers[mapperId];
-        this.readCart = (addr) => mapper.read(addr);
-        this.writeCart = (addr, val) => mapper.write(addr, val);
-        this.readChr = (addr) => mapper.readChr(addr);
-        this.writeChr = (addr, val) => mapper.writeChr(addr, val);
+        this.mapper = this.cartridge.mappers[mapperId];
+        // this.readCart = (addr) => this.mapper.read(addr);
+        // this.writeCart = (addr, val) => this.mapper.write(addr, val);
+        // this.readChr = (addr) => this.mapper.readChr(addr);
+        // this.writeChr = (addr, val) => this.mapper.writeChr(addr, val);
     };
+    this.loadMapper(0); // by default
 
     this.loadRomProps = function(rom) {
         // iNES magic bytes
-        if (rom[0] !== 0x4e || rom[1] !== 0x45 || rom[2] !== 0x53 || rom[3] !== 0x1a)
-            throw 'unsupported rom !';
+        if (rom[0] !== 0x4e || rom[1] !== 0x45 || rom[2] !== 0x53 || rom[3] !== 0x1a) {
+            throw 'Invalid ROM!';
+            return;
+        }
+
+        // Mappers
+        var mapperId = (rom[6] >> 4) | (rom[7] & 0xf0);
+        console.log('mapper:', mapperId);
+        if (!this.cartridge.mappers[mapperId]) {
+            throw `Unsupported ROM (map: ${mapperId})!`;
+            return;
+        }
 
         // rom
         this.romSize = 0x4000 * rom[4];
@@ -454,7 +471,8 @@ const Mem = function(nes) {
         this.cartramSizeMask = this.cartramSize - 1;
 
         // Nametable mirroring
-        if (rom[6] & 1) {
+        this.nametable4screen = (rom[6] & 0x8) !== 0; // 4 screen
+        if (rom[6] & 0x1) {
             // vertical
             this.nametable0map = 0;
             this.nametable1map = 1;
@@ -468,10 +486,6 @@ const Mem = function(nes) {
             this.nametable2map = 1;
             this.nametable3map = 1;
         }
-
-        // Mappers
-        var mapperId = (rom[6] >> 4) | (rom[7] & 0xf0);
-        console.log('mapper:', mapperId);
 
         this.loadRomIntoMem(rom);
         this.loadMapper(mapperId);
@@ -506,7 +520,7 @@ const Mem = function(nes) {
         this.ppuData = 0;
 
         // reset cartridge
-        this.cartridge.reset();
+        this.mapper.reset();
     };
 
 };

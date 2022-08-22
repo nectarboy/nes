@@ -22,10 +22,22 @@ nes.onkeyreset = () => setStatus('Reset!', 1);
 
 window.nes = nes; // DEBUG ;)
 function startNESWithRomBuff(romBuff) {
+    var fail = false;
+
     // romBuff should be a Uint8Array buffer
     nes.stop();
-    nes.loadRomBuff(romBuff);
+    try {
+        nes.loadRomBuff(romBuff);
+    }
+    catch (e) {
+        fail = true;
+        setStatus(e.toString(), 1);
+    }
     nes.start();
+
+    if (!fail) {
+        setStatus('Loaded ROM!', 0);
+    }
 }
 
 // Fullscreen
@@ -113,7 +125,6 @@ function readFile(file) {
     var reader = new FileReader();
     reader.onload = function() {
         startNESWithRomBuff(reader.result);
-        setStatus('Loaded ROM!', 0);
     };
 
     reader.readAsArrayBuffer(file);

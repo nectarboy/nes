@@ -18,6 +18,10 @@ If issues show up though, (or if i manage to make it fast enough), i'll do my be
 ![red panda <3](https://github.com/nectarboy/nes/blob/main/docs/pics/Homebrew/redpanda.png?raw=true)
 ![donkey fuck](https://github.com/nectarboy/nes/blob/main/docs/pics/Mega_Man_2/title.png?raw=true)
 
+![super fuckin mario](https://github.com/nectarboy/nes/blob/main/docs/pics/Tetris/stack.png?raw=true)
+![red panda <3](https://github.com/nectarboy/nes/blob/main/docs/pics/Kirbys_Adventure/crane.png?raw=true)
+![donkey fuck](https://github.com/nectarboy/nes/blob/main/docs/pics/River_City_Ransom/title.png?raw=true)
+
 ---
 
 ## functionality
@@ -49,16 +53,21 @@ PAUSE   - P
 
 These are the default keybinds, they cannot be changed atm soz lol :3
 
-### progress
+### compatibility
 ```
 - cpu           (%95)
 - ppu           (%90)
-- cartridge     (%15)
+- cartridge     (%20)
 - apu           (%25)
 - joypad        (%90)
 - extra stuff   (%0)
 - cool emu shit (%10)
 ```
+
+Current mappers supported:
+- NROM
+- MMC1
+- MMC3 (WIP)
 
 ### importing
 if you want to import Pooptendo to your site or something, first of all pls credit me :3, second of all:

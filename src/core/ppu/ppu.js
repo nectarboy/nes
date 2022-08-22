@@ -13,7 +13,7 @@ const Ppu = function(nes) {
     // it doesnt need to go through all these fuckin if statements every time so performance go weeeee
     this.read = function(addr) {
         if (addr < 0x2000) {
-            return mem.readChr(addr); // 8KB addressable CHR
+            return mem.mapper.readChr(addr); // 8KB addressable CHR
         }
         else if (addr < 0x2400) {
             return mem.nametable[mem.nametable0map][addr - 0x2000]; // Nametable map 0
@@ -41,7 +41,7 @@ const Ppu = function(nes) {
 
     this.write = function(addr, val) {
         if (addr < 0x2000) {
-            mem.writeChr(addr, val); // 8KB addressable CHR
+            mem.mapper.writeChr(addr, val); // 8KB addressable CHR
         }
         else if (addr < 0x2400) {
             mem.nametable[mem.nametable0map][addr - 0x2000] = val; // Nametable map 0
@@ -73,7 +73,7 @@ const Ppu = function(nes) {
         var oldBusData = this.busData;
 
         if (addr < 0x2000) {
-            this.busData = mem.readChr(addr); // CHR
+            this.busData = mem.mapper.readChr(addr); // CHR
         }
         else if (addr < 0x2400) {
             this.busData = mem.nametable[mem.nametable0map][addr - 0x2000]; // Nametable map 0
@@ -216,10 +216,8 @@ const Ppu = function(nes) {
                         this.ppuAddr &= 0b0000010000011111;
                         this.ppuAddr |= this.tAddr & 0b0111101111100000;
                     }
-                    else {
-                        // Sprite evaluation finishes on cycle 256 but whatveer
-                        this.quickSpriteEval();
-                    }
+                    // Sprite evaluation finishes on cycle 256 but whatveer
+                    this.quickSpriteEval(); // At least i think we still eval on prerender scanline ?
 
                     // This is supposed to happen until cycle 320 but what. fuckin. ever
                     this.fetchSpriteAhead();
@@ -336,7 +334,7 @@ const Ppu = function(nes) {
         this.cycles = 0;
         this.preRender = true;
 
-        this.ly = 261; // Set to pre-render scanline
+        this.ly = -1; // Set to pre-render scanline
         this.mode = 0; // Back to rendering !
     };
 
@@ -412,7 +410,7 @@ const Ppu = function(nes) {
 
                 if (bit) {
                     // Sprite 0 check
-                    if (!this.sprite0Happened && this.sNums[i] === 0) {
+                    if (!this.sprite0Atm && this.sNums[i] === 0) {
                         this.sprite0Atm = true;
                         this.sprite0Happened = true;
                     }
@@ -514,8 +512,8 @@ const Ppu = function(nes) {
 
             var dataAddr = pattable + (tileind * 16) + sy;
 
-            this.sData[datai]     = mem.readChr(dataAddr);
-            this.sData[datai + 1] = mem.readChr(dataAddr + 8);
+            this.sData[datai]     = mem.mapper.readChr(dataAddr);
+            this.sData[datai + 1] = mem.mapper.readChr(dataAddr + 8);
         }
     };
 
@@ -529,8 +527,8 @@ const Ppu = function(nes) {
         const fineY = (this.ppuAddr >> 12);
 
         const dataAddr = this.patTable + (nameByte * 16) + fineY;
-        this.preData[0] = this.read(dataAddr);
-        this.preData[1] = this.read(dataAddr + 8);
+        this.preData[0] = mem.mapper.readChr(dataAddr);
+        this.preData[1] = mem.mapper.readChr(dataAddr + 8);
 
         // Attribute data
         const attrAddr = 0x23c0 | (this.ppuAddr & 0x0c00) | ((this.ppuAddr >> 4) & 0x38) | ((this.ppuAddr >> 2) & 7);
@@ -606,17 +604,21 @@ const Ppu = function(nes) {
         this.vblankFlag = false;
 
         this.newFrame();
+        this.ly = 0; // No prerender scanline on first frame
     };
 
     // =============== // Debug Functions //
-    this.debugDrawChr = function() {
-        for (var i = 0; i < mem.chr.length; i += 16) {
+    this.debugDrawChr = function(bank=0) {
+        var i = 0;
+        var start = bank * 0x2000;
+        var end = bank + 0x2000;
+        while (i < 0x2000) {
 
             for (var y = 0; y < 8; y++) {
                 var yy = (0|(i/constants.screen_width))*8 + y;
 
-                var hi = mem.chr[i + 8 + y];
-                var lo = mem.chr[i + y];
+                var hi = mem.chr[start + 8 + y];
+                var lo = mem.chr[start + y];
 
                 for (var x = 0; x < 8; x++) {
                     var bit = (((hi >> (x^7)) & 1) << 1) | ((lo >> (x^7)) & 1);
@@ -626,12 +628,14 @@ const Ppu = function(nes) {
                 }
             }
 
+            i += 16;
+            start += 16;
         }
 
         this.rendering.renderImg();
     };
 
-    this.debugDrawNT = function(nt) {
+    this.debugDrawNT = function(nt=0) {
         var table = mem.nametable[nt];
 
         for (var i = 0; i < 30; i++) {

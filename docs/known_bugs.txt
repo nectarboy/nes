@@ -1,19 +1,23 @@
 CPU:
+- The CPU runs slightly too slow i suspect?(Music sounds slightly slower to me)
 - BRK is bugged (according to blarg instr_test v5)
 - CPU timings are off (blarg instr_timing)
+
 PPU:
-- sprites overflow from bottom of screen to first scanline
-possible culprit: prerender scanline being hardcoded as -1
+- PPU timings are off (blarg says so)
 
 -----------------------------------------
-SUPER MARIO BROS: death jingle is flat (no sweep)
-possible culprit: I DONT KNOW ;-;
+[FIXED] SUPER MARIO BROS: death jingle fixed ^-^
+cause: sweep reload bug
 
-TETRIS: '0' characters are a lil bit corrupted for some reason
-possible culprit: MMC1, possibly smth with pages
+[FIXED] TETRIS: '0' character fixed ^-^
+cause: MMC1 overwrote chr rom
 
 DOUBLE DRAGON: the intro with the girl getting kidnapped flickers with the menu bar going up
-possible culprit: ??? idk ??? maybe sprite 0 ?
+theory: cpu is somehow too slow to catch sprite 0 hitting
+
+SUPER MARIO BROS 2: jumping sound effect is bugged
+cause: apu prolly
 
 -----------------------------------------
 if you see any bugs, please open an issue on the github !

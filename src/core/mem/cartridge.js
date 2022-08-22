@@ -10,7 +10,7 @@ const Cartridge = function(nes, mem) {
     this.mappers[0] = {
         read(addr) {
             if (addr < 0x8000) {
-                return 0; // cartram
+                return 0; // cartram (OPENBUS)
             }
             else {
                 return mem.rom[(addr & 0x7fff) & mem.romSizeMask]; // rom
@@ -33,6 +33,7 @@ const Cartridge = function(nes, mem) {
         }
     };
 
+    // MMC1
     // TODO: optimize reads n shit
     // idk how just do it
     this.mappers[1] = {
@@ -56,13 +57,16 @@ const Cartridge = function(nes, mem) {
         nametablemirroring: 0,
 
         read(addr) {
+            if (addr < 0x6000)
+                return 0; // TODO: openbus
+
             // CARTRAM
             if (addr < 0x8000) {
                 if (this.ramenabled) {
-                    return mem.cartram[(addr-0x4020) & mem.cartramSizeMask];
+                    return mem.cartram[(addr-0x6000) & mem.cartramSizeMask];
                 }
                 else {
-                    return 0;
+                    return 0; // TODO: openbus
                 }
             }
             // ROM
@@ -79,9 +83,12 @@ const Cartridge = function(nes, mem) {
             }
         },
         write(addr, val) {
+            if (addr < 0x6000)
+                return;
+
             if (addr < 0x8000) {
                 if (this.ramenabled) {
-                    mem.cartram[(addr-0x4020) & mem.cartramSizeMask] = val;
+                    mem.cartram[(addr-0x6000) & mem.cartramSizeMask] = val;
                 }
             }
             // bank shifting
@@ -155,6 +162,9 @@ const Cartridge = function(nes, mem) {
             }
         },
         writeChr(addr, val) {
+            if (mem.hasChrRam === false)
+                return;
+
             if (this.chrwhole) {
                 mem.chr[(addr + this.chrbank0addr) & mem.chrSizeMask] = val;
             }
@@ -242,40 +252,224 @@ const Cartridge = function(nes, mem) {
         }
     };
 
+    // MMC3
     this.mappers[4] = {
-        bank: new Array(8),
-        bankaddr: new Array(8),
-        secondlastbankaddr: 0,
+        bankselected: 0,
+        banks: new Array(8),
 
-        // reg 0
-        selectedbank: 0,
-        rominverted: false,
-        chrinverted: false,
+        cpubankaddr: new Array(4),
+        cpuinvert: false,
+
+        ppubankaddr: new Array(6),
+        ppuinvert: false,
 
         irqcounter: 0,
 
-        read(addr) {
+        fixCpuAddr() {
+            if (this.cpuinvert) {
+                this.cpubankaddr[0] = mem.romSize - 0x4000;
+                this.cpubankaddr[2] = 0x2000 * this.banks[6];
+            }
+            else {
+                this.cpubankaddr[0] = 0x2000 * this.banks[6];
+                this.cpubankaddr[2] = mem.romSize - 0x4000;
+            }
 
+            // Applies for both cases
+            this.cpubankaddr[1] = 0x2000 * this.banks[7];
+            this.cpubankaddr[3] = mem.romSize - 0x2000;
+        },
+        fixPpuAddr() {
+            this.ppubankaddr[0] = (this.banks[0] & 0xfe) * 0x400;
+            this.ppubankaddr[1] = (this.banks[1] & 0xfe) * 0x400;
+
+            this.ppubankaddr[2] = this.banks[2] * 0x400;
+            this.ppubankaddr[3] = this.banks[3] * 0x400;
+            this.ppubankaddr[4] = this.banks[4] * 0x400;
+            this.ppubankaddr[5] = this.banks[5] * 0x400;
+        },
+        fixMirroring(val) {
+            if (mem.nametable4screen) {
+                mem.nametable0map = 0;
+                mem.nametable1map = 1;
+                mem.nametable2map = 2;
+                mem.nametable3map = 3;
+            }
+            else if (val & 1) {
+                // horizontal
+                mem.nametable0map = 0;
+                mem.nametable1map = 0;
+                mem.nametable2map = 1;
+                mem.nametable3map = 1;
+            }
+            else {
+                // vertical
+                mem.nametable0map = 0;
+                mem.nametable1map = 1;
+                mem.nametable2map = 0;
+                mem.nametable3map = 1;
+            }
+        },
+
+        read(addr) { // TODO: SWITCH STATEMENT PLSSSSSS
+            if (addr < 0x6000)
+                return 0; // OPENBUS
+
+            // Cart Ram
+            if (addr < 0x8000) {
+                if (true) {
+                    return mem.cartram[(addr-0x6000) & mem.cartramSizeMask];
+                }
+                else {
+                    return 0; // OPENBUS
+                }
+            }
+
+            // PRG
+            else if (addr < 0xa000) {
+                return mem.rom[((addr-0x8000) + this.cpubankaddr[0]) & mem.romSizeMask];
+            }
+            else if (addr < 0xc000) {
+                return mem.rom[((addr-0xa000) + this.cpubankaddr[1]) & mem.romSizeMask];
+            }
+            else if (addr < 0xe000) {
+                return mem.rom[((addr-0xc000) + this.cpubankaddr[2]) & mem.romSizeMask];
+            }
+            else {
+                return mem.rom[((addr-0xe000) + this.cpubankaddr[3]) & mem.romSizeMask];
+            }
         },
         write(addr, val) {
+            if (addr < 0x6000)
+                return;
 
+            // Cartram
+            if (addr < 0x8000) {
+                if (true) {
+                    mem.cartram[(addr-0x6000) & mem.cartramSizeMask] = val;
+                }
+            }
+            // Registers
+            else {
+                switch (addr >> 13) {
+                    case 0x4: {
+                        // Bank data (odd)
+                        if (addr & 1) {
+                            this.banks[this.bankselected] = val;
+
+                            if (this.bankselected < 0b110)
+                                this.fixPpuAddr();
+                            else
+                                this.fixCpuAddr();
+                        }
+                        // Bank Select (even)
+                        else {
+                            this.bankselected = val & 7;
+
+                            this.cpuinvert = (val & 0x40) !== 0;
+                            this.ppuinvert = (val & 0x80) !== 0;
+                            this.fixCpuAddr();
+                            this.fixPpuAddr();
+                        }
+                        break;
+                    }
+                    case 0x5: {
+                        if (addr & 1) {
+                            // PRG RAM Protect (odd)
+                        }
+                        else {
+                            // Mirroring (even)
+                            console.log(val);
+                            this.fixMirroring(val);
+                        }
+                        break;
+                    }
+                    case 0x6: {
+                        if (addr & 1) {
+                            // Bank data (odd)
+                        }
+                        else {
+                            // Bank Select (even)
+                        }
+                        break;
+                    }
+                    case 0x7: {
+                        if (addr & 1) {
+                            // Bank data (odd)
+                        }
+                        else {
+                            // Bank Select (even)
+                        }
+                        break;
+                    }
+                }
+            }
         },
-        readChr(addr) {
 
+        readChr(addr) {
+            if (this.ppuinvert) {
+                // 1kb banks
+                if (addr < 0x0400) {
+                    return mem.chr[((addr & 0x3ff) + this.ppubankaddr[2]) & mem.chrSizeMask]; 
+                }
+                else if (addr < 0x0800) {
+                    return mem.chr[((addr & 0x3ff) + this.ppubankaddr[3]) & mem.chrSizeMask]; 
+                }
+                else if (addr < 0x0c00) {
+                    return mem.chr[((addr & 0x3ff) + this.ppubankaddr[4]) & mem.chrSizeMask]; 
+                }
+                else if (addr < 0x1000) {
+                    return mem.chr[((addr & 0x3ff) + this.ppubankaddr[5]) & mem.chrSizeMask];
+                }
+                // 2kb banks
+                else if (addr < 0x1800) {
+                    return mem.chr[((addr & 0x7ff) + this.ppubankaddr[0]) & mem.chrSizeMask]; 
+                }
+                else {
+                    return mem.chr[((addr & 0x7ff) + this.ppubankaddr[1]) & mem.chrSizeMask];     
+                }
+            }
+            else {
+                // 2kb banks
+                if (addr < 0x0800) {
+                    return mem.chr[((addr & 0x7ff) + this.ppubankaddr[0]) & mem.chrSizeMask]; 
+                }
+                else if (addr < 0x1000) {
+                    return mem.chr[((addr & 0x7ff) + this.ppubankaddr[1]) & mem.chrSizeMask];     
+                }
+                // 1kb banks
+                else if (addr < 0x1400) {
+                    return mem.chr[((addr & 0x3ff) + this.ppubankaddr[2]) & mem.chrSizeMask]; 
+                }
+                else if (addr < 0x1800) {
+                    return mem.chr[((addr & 0x3ff) + this.ppubankaddr[3]) & mem.chrSizeMask]; 
+                }
+                else if (addr < 0x1c00) {
+                    return mem.chr[((addr & 0x3ff) + this.ppubankaddr[4]) & mem.chrSizeMask]; 
+                }
+                else {
+                    return mem.chr[((addr & 0x3ff) + this.ppubankaddr[5]) & mem.chrSizeMask];
+                }
+            }
         },
         writeChr(addr, val) {
-
+            if (mem.hasChrRam) {
+                mem.chr[addr & mem.chrSizeMask] = val; // 16KB CHR RAM
+            }
         },
 
         reset() {
-
+            this.bankselected = 0;
+            this.banks.fill(0);
+            this.cpubankaddr.fill(0);
+            this.ppubankaddr.fill(0);
+            this.fixCpuAddr();
+            this.fixPpuAddr();
+            this.fixMirroring(0);
         }
     };
 
-    // =============== // Reset //
-    this.reset = function() {
-        this.mappers[mem.mapperId].reset();
-    };
+    //this.mappers[4] = this.mappers[0]; // debug hehe
 };
 
 export default Cartridge;
