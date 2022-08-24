@@ -184,8 +184,9 @@ const Mem = function(nes) {
             }
 
             case 0x4017: { // FRAME COUNTER
-                nes.apu.fcIrqEnabled = (val & 0x10) !== 0;
                 nes.apu.fcmode = (val & 0x80) !== 0;
+                if ((val & 0x40) !== 0)
+                    nes.apu.fcIrqEnabled = false;
 
                 // Reset tick and step
                 nes.apu.fctick = 0;
@@ -256,12 +257,13 @@ const Mem = function(nes) {
                 break;
             }
             case 7: { // PPUDATA
-                var byte = nes.ppu.readFromCPU(nes.ppu.ppuAddr & 0x3fff);
+                var ppuaddr = nes.ppu.ppuAddr & 0x3fff;
+                nes.mem.mapper.feedAddr(ppuaddr);
 
                 nes.ppu.ppuAddr += this.ppuAddrInc;
                 nes.ppu.ppuAddr &= 0xffff;
 
-                return byte;
+                return nes.ppu.readFromCPU(ppuaddr);
                 break;
             }
 

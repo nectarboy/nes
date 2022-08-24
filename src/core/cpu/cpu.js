@@ -122,13 +122,14 @@ const Cpu = function(nes) {
     this.intVec = 0;
     this.interrupting = false;
     this.shouldInterrupt = false;
+    this.isNMI = false;
 
     this.interrupt = function() {
         this.intCycle++;
         switch (this.intCycle) {
             case 1:
             case 2:
-                // Some kind of useless read or whatever
+                //this.cpu6502.fetch(); // useless read ugh
                 break;
             case 3:
                 this.push(this.pc >> 8);
@@ -148,19 +149,24 @@ const Cpu = function(nes) {
                 this.intCycle = 0;
                 this.interrupting = false;
                 this.shouldInterrupt = false;
+                this.isNMI = false;
                 break;
         }
     };
 
     // Interrupt generation
-    this.generateNMI = function() {
-        if (this.shouldInterrupt)
+    this.requestIrq = function() {
+        if (this.isNMI)
             return;
 
+        this.intVec = 0xfffe;
         this.shouldInterrupt = true;
+    };
+
+    this.requestNMI = function() {
+        this.isNMI = true;
         this.intVec = 0xfffa;
-        nes.ppu.considerNmiEnabled = false;
-        //nes.ppu.vblankFlag = false;
+        this.shouldInterrupt = true;
     };
 
     // =============== // Execution //

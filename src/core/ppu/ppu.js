@@ -9,8 +9,49 @@ const Ppu = function(nes) {
     this.rendering = rendering;
 
     // =============== // Reading and Writing //
-    // TODO: make seperate read functions for each block SO THAT when the ppu reads data and whatnot
-    // it doesnt need to go through all these fuckin if statements every time so performance go weeeee
+    // Functions for the PPU to use during execution, for optimisation :)
+    this.readPallete = function(addr) {
+        var masked = addr & 0x1f;
+        if ((masked & 0b10011) === 0b10000)
+            masked &= 0xf;
+
+        return mem.palleteram[masked];
+    };
+    this.readNametables = function(addr) {
+        if (addr < 0x2400) {
+            return mem.nametable[mem.nametable0map][addr - 0x2000]; // Nametable map 0
+        }
+        else if (addr < 0x2800) {
+            return mem.nametable[mem.nametable1map][addr - 0x2400]; // Nametable map 1
+        }
+        else if (addr < 0x2c00) {
+            return mem.nametable[mem.nametable2map][addr - 0x2800]; // Nametable map 2
+        }
+        else if (addr < 0x3000) {
+            return mem.nametable[mem.nametable3map][addr - 0x2c00]; // Nametable map 3
+        }
+        else {
+            return this.readNametables(addr - 0x1000); // Mirror of nametables
+        }
+    };
+    this.writeNametables = function(addr, val) {
+        if (addr < 0x2400) {
+            mem.nametable[mem.nametable0map][addr - 0x2000] = val; // Nametable map 0
+        }
+        else if (addr < 0x2800) {
+            mem.nametable[mem.nametable1map][addr - 0x2400] = val; // Nametable map 1
+        }
+        else if (addr < 0x2c00) {
+            mem.nametable[mem.nametable2map][addr - 0x2800] = val; // Nametable map 2
+        }
+        else if (addr < 0x3000) {
+            mem.nametable[mem.nametable3map][addr - 0x2c00] = val; // Nametable map 3
+        }
+        else {
+            this.writeNametables(addr - 0x1000, val); // Mirror of nametables
+        }
+    };
+
     this.read = function(addr) {
         if (addr < 0x2000) {
             return mem.mapper.readChr(addr); // 8KB addressable CHR
@@ -28,9 +69,9 @@ const Ppu = function(nes) {
             return mem.nametable[mem.nametable3map][addr - 0x2c00]; // Nametable map 3
         }
         else if (addr < 0x3f00) {
-            return this.read(addr - 0x1000); // Mirror of nametables
+            return this.readNametables(addr - 0x1000); // Mirror of nametables
         }
-        else {
+        else { // Pallete
             var masked = addr & 0x1f;
             if ((masked & 0b10011) === 0b10000)
                 masked &= 0xf;
@@ -56,9 +97,9 @@ const Ppu = function(nes) {
             mem.nametable[mem.nametable3map][addr - 0x2c00] = val; // Nametable map 3
         }
         else if (addr < 0x3f00) {
-            this.write(addr - 0x1000, val); // Mirror of nametables
+            this.writeNametables(addr - 0x1000, val); // Mirror of nametables
         }
-        else {
+        else { // Pallete
             var masked = addr & 0x1f;
             if ((masked & 0b10011) === 0b10000)
                 masked &= 0xf;
@@ -88,7 +129,7 @@ const Ppu = function(nes) {
             this.busData = mem.nametable[mem.nametable3map][addr - 0x2c00]; // Nametable map 3
         }
         else if (addr < 0x3f00) {
-            this.busData = this.read(addr - 0x1000); // Mirror of nametables
+            this.busData = this.readNametables(addr - 0x1000); // Mirror of nametables
         }
         else {
             var masked = addr & 0x1f;
@@ -199,7 +240,7 @@ const Ppu = function(nes) {
                 if (shouldDraw && (lx & 7) === 0) {
                     this.fetchBgAhead();
                     this.incCoarseX();
-                    this.fetchSpriteAhead();
+                    //this.fetchSpriteAhead();
                 }
 
                 // Update PPU addr for next scanline
@@ -216,13 +257,14 @@ const Ppu = function(nes) {
                         this.ppuAddr &= 0b0000010000011111;
                         this.ppuAddr |= this.tAddr & 0b0111101111100000;
                     }
+
                     // Sprite evaluation finishes on cycle 256 but whatveer
                     this.quickSpriteEval(); // At least i think we still eval on prerender scanline ?
 
                     // This is supposed to happen until cycle 320 but what. fuckin. ever
                     this.fetchSpriteAhead();
 
-                    // This is supposed to happen on cycle 336 but what fuckin ever
+                    // This is supposed to happen on cycle 320 to 340 but what fuckin ever
                     this.fetchBgAhead();
                     this.incCoarseX();
                 }
@@ -293,7 +335,8 @@ const Ppu = function(nes) {
 
                 // Vblank NMIs !
                 if (this.considerNmiEnabled && this.vblankFlag) {
-                    nes.cpu.generateNMI();
+                    this.considerNmiEnabled = false;
+                    nes.cpu.requestNMI();
                 }
 
                 // End of vblank scanline ...
@@ -340,10 +383,10 @@ const Ppu = function(nes) {
 
     // Background rendering
     this.mixBgPixel = function(lx, bit, attr) {
-        const coarseX = this.ppuAddr - (lx >> 3) + 2; // The +2 is bullshit lmao
+        var coarseX = this.ppuAddr - (lx >> 3) + 2; // The +2 is bullshit lmao
 
         var x = lx + (((coarseX & 1) << 3) | this.fineX);
-        const y = this.ly +
+        var y = this.ly +
             (((this.ppuAddr >> 5) - (this.ly >> 3) & 3) << 3) // Combine coarse y ...
             | (this.ppuAddr >> 12); // ... with fine y !
 
@@ -351,28 +394,31 @@ const Ppu = function(nes) {
         x -= (coarseX & 0b10) << 3; // If bit set, sub region-check x by 16
 
         if (bit) {
-            const region = 3 & (
+            var region = 3 & (
                 attr >> (
                     (((x >> 4) & 1) << 1)
                     | (((y >> 4) & 1) << 2)
                 )
             );
 
-            const palMemAddr = 0x3f00 | (region << 2);
-            return this.read(palMemAddr | bit);
+            var palMemAddr = 0x3f00 | (region << 2) | bit;
+            nes.mem.mapper.feedAddr(palMemAddr);
+            return this.readPallete(palMemAddr);
         }
         else {
-            return this.read(0x3f00);
+            nes.mem.mapper.feedAddr(0x3f00);
+            return this.readPallete(0x3f00);
         }
     };
 
     this.getBgPixel = function(lx) {
-        if (!this.bgEnabled) {
-            return this.read(0x3f00);
+        if (this.bgEnabled === false) {
+            nes.mem.mapper.feedAddr(0x3f00);
+            return this.readPallete(0x3f00);
         }
 
-        const sum = (lx & 7) + this.fineX;
-        const shift = ((lx + this.fineX) & 7) ^ 7;
+        var sum = (lx & 7) + this.fineX;
+        var shift = ((lx + this.fineX) & 7) ^ 7;
 
         var px = 0;
         var bit = 0;
@@ -419,8 +465,10 @@ const Ppu = function(nes) {
                     if (this.sAttr[i].priority && this.bgMap[this.ly * constants.screen_width + lx])
                         continue;
 
-                    const palMemAddr = 0x3f10 | (this.sAttr[i].pallete << 2);
-                    return this.read(palMemAddr | bit);
+                    const palMemAddr = 0x3f10 | (this.sAttr[i].pallete << 2) | bit;
+
+                    nes.mem.mapper.feedAddr(palMemAddr);
+                    return this.readPallete(palMemAddr);
                 }
             }
         }
@@ -437,14 +485,15 @@ const Ppu = function(nes) {
         this.spritesThisLine = 0;
 
         for (var i = 0; i < 64; i++) {
-            const oami = (i*4 + this.oamAddr) & 0xff;
+            var oami = (i*4 + this.oamAddr) & 0xff;
 
             if (
                 this.ly >= mem.oam[oami] && 
                 this.ly < mem.oam[oami] + this.spriteSize
             ) {
                 // ... if all conditions met
-                const soami = this.spritesThisLine * 4;
+                var soami = this.spritesThisLine << 2;
+
                 this.sOam[soami]   = mem.oam[oami];
                 this.sOam[soami+1] = mem.oam[oami+1];
                 this.sOam[soami+2] = mem.oam[oami+2];
@@ -460,8 +509,16 @@ const Ppu = function(nes) {
 
                 this.spritesThisLine++;
                 if (this.spritesThisLine === 8)
-                    return; // [sprite overflow bug later]
+                    return; // [sprite overflow bug ~later~ never]
             }
+        }
+
+        var i = this.spritesThisLine << 2;
+        while (i < 8) {
+            this.sOam[i++] = 0xff;
+            this.sOam[i++] = 0xff;
+            this.sOam[i++] = 0xff;
+            this.sOam[i++] = 0xff;
         }
     };
 
@@ -469,17 +526,13 @@ const Ppu = function(nes) {
     this.fetchSpriteAhead = function() {
         this.oamAddr = 0;
 
-        // If sprites are disabled, then why bother uwu
-        if (!this.spritesEnabled)
-            return;
-
         for (var i = 0; i < 8; i++) {
             // If no more sprites, we done
-            if (i === this.spritesThisLine)
-                return;
+            // if (i === this.spritesThisLine)
+            //     return;
 
-            const oami = i * 4;
-            const datai = i * 2;
+            var oami = i << 2;
+            var datai = i << 1;
 
             // Attribute data (NOTE :: should this be done every fetch ?? cant we just do this once on eval)
             // const attrByte = this.sOam[oami + 2];
@@ -492,9 +545,10 @@ const Ppu = function(nes) {
             this.sX[i] = this.sOam[oami + 3];
 
             // Pattern data
-            var sy = (this.ly-1) - this.sOam[oami]; // The -1 is bullshit :|
+            var sy = this.ly - this.sOam[oami];
             var tileind = this.sOam[oami + 1]
             var pattable = this.spritePatTable;
+
             if (this.doubleSprites) {
                 pattable = (tileind & 1) << 12;
                 if (this.sAttr[i].yflip) {
@@ -513,7 +567,10 @@ const Ppu = function(nes) {
             var dataAddr = pattable + (tileind * 16) + sy;
 
             this.sData[datai]     = mem.mapper.readChr(dataAddr);
-            this.sData[datai + 1] = mem.mapper.readChr(dataAddr + 8);
+            nes.mem.mapper.feedAddr(dataAddr);
+            dataAddr += 8;
+            this.sData[datai + 1] = mem.mapper.readChr(dataAddr);
+            nes.mem.mapper.feedAddr(dataAddr);
         }
     };
 
@@ -523,16 +580,19 @@ const Ppu = function(nes) {
         this.currAttr = this.preAttr;
 
         // Pattern data
-        const nameByte = this.read(0x2000 | (this.ppuAddr & 0x0fff)); // Nametable address
-        const fineY = (this.ppuAddr >> 12);
+        var nameAddr = 0x2000 | (this.ppuAddr & 0x0fff);
+        nes.mem.mapper.feedAddr(nameAddr);
+        var nameByte = this.readNametables(nameAddr); // Nametable address
+        var fineY = (this.ppuAddr >> 12);
 
-        const dataAddr = this.patTable + (nameByte * 16) + fineY;
+        var dataAddr = this.patTable + (nameByte * 16) + fineY;
         this.preData[0] = mem.mapper.readChr(dataAddr);
         this.preData[1] = mem.mapper.readChr(dataAddr + 8);
 
         // Attribute data
-        const attrAddr = 0x23c0 | (this.ppuAddr & 0x0c00) | ((this.ppuAddr >> 4) & 0x38) | ((this.ppuAddr >> 2) & 7);
-        this.preAttr = this.read(attrAddr);
+        var attrAddr = 0x23c0 | (this.ppuAddr & 0x0c00) | ((this.ppuAddr >> 4) & 0x38) | ((this.ppuAddr >> 2) & 7);
+        nes.mem.mapper.feedAddr(attrAddr);
+        this.preAttr = this.readNametables(attrAddr);
 
     };
 

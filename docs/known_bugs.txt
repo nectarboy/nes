@@ -6,9 +6,15 @@ CPU:
 PPU:
 - PPU timings are off (blarg says so)
 
+MMC3:
+- scanline counter is off by 1 woooow
+
 -----------------------------------------
 [FIXED] SUPER MARIO BROS: death jingle fixed ^-^
-cause: sweep reload bug
+cause: sweep div reload bug
+
+[FIXED] SUPER MARIO BROS 2: jump sound fixed ^-^
+cause: also sweep bug
 
 [FIXED] TETRIS: '0' character fixed ^-^
 cause: MMC1 overwrote chr rom
@@ -16,8 +22,8 @@ cause: MMC1 overwrote chr rom
 DOUBLE DRAGON: the intro with the girl getting kidnapped flickers with the menu bar going up
 theory: cpu is somehow too slow to catch sprite 0 hitting
 
-SUPER MARIO BROS 2: jumping sound effect is bugged
-cause: apu prolly
+KIRBY'S ADVENTURE: status bar flickers
+cause: scanline counter wow!!!!
 
 -----------------------------------------
 if you see any bugs, please open an issue on the github !

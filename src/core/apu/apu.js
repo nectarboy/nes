@@ -163,7 +163,7 @@ function Apu(nes) {
                     this.sweepstart = true;
 
                     this.updateSweepTarget();
-                    if (this.sweepenabled && this.sweepplaying === 1) {
+                    if (this.sweepenabled && this.sweepplaying === 1 && this.sweepshift !== 0) {
                         this.freqreload = this.sweeptarget;
                         this.updateSweepTarget();
                     }
@@ -362,7 +362,7 @@ function Apu(nes) {
             this.fctick = 0;
 
             if (this.fcIrqEnabled) {
-                // ...
+                //nes.cpu.requestIrq(); // FIXME :|
             }
         }
     };

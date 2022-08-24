@@ -137,6 +137,7 @@ const Cpu6502 = function(nes, cpu) {
     this.currOp = 0;
     this.currIns = this.nop; // idk :/
 
+    var spare = 0;
     var oper = 0;
     var addr = 0;
     var cmpOper = 0;
@@ -194,6 +195,7 @@ const Cpu6502 = function(nes, cpu) {
         }
     };
 
+    // things
     this.absolute_i = function(i, read) {
         switch (this.opCycle) {
             case 1:
@@ -210,6 +212,28 @@ const Cpu6502 = function(nes, cpu) {
                 break;
             case 3:
                 // Expend a cycle if page crossed
+                break;
+            case 4:
+                if (read)
+                    oper = cpu.read(addr);
+                break;
+        }
+    };
+    this.absolute_i_rw = function(i, read) {
+        switch (this.opCycle) {
+            case 1:
+                var sum = this.fetch() + i;
+                addr = sum & 0xff;
+
+                spare = sum > 0xff; // page crossed
+                break;
+            case 2:
+                addr |= this.fetch() << 8;
+                break;
+            case 3:
+                if (read)
+                    oper = cpu.read(addr);
+                addr = (addr + (spare << 8)) & 0xffff;
                 break;
             case 4:
                 if (read)
@@ -275,6 +299,31 @@ const Cpu6502 = function(nes, cpu) {
                 addr = sum;
             case 4:
                 // Expend a cycle if page crossed
+                break;
+            case 5:
+                if (read)
+                    oper = cpu.read(addr);
+                break;
+        }
+    };
+    this.indirect_y_rw = function(read) {
+        switch (this.opCycle) {
+            case 1:
+                oper = this.fetch();
+                break;
+            case 2:
+                addr = cpu.read(oper++); // lo byte
+                break;
+            case 3:
+                addr |= cpu.read(oper & 0xff) << 8; // hi byte
+
+                var sum = (addr + cpu.y) & 0xffff;
+                // Page crossing
+                //this.opCycle += (addr & 0x0f00) === (sum & 0x0f00);
+                addr = sum;
+            case 4:
+                if (read)
+                    oper = cpu.read(addr);
                 break;
             case 5:
                 if (read)
@@ -455,7 +504,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.asl_abs_x = function() {
-        this.absolute_i(cpu.x, true);
+        this.absolute_i_rw(cpu.x, true);
 
         if (this.opCycle === 5) {
             cpu.write(addr, oper);
@@ -514,6 +563,7 @@ const Cpu6502 = function(nes, cpu) {
         switch (this.opCycle) {
             case 1:
                 this.fetch(); // dummy fetch
+                cpu.p_i = true;
                 break;
             case 2:
                 cpu.push(cpu.pc >> 8);
@@ -666,7 +716,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.dec_abs_x = function() {
-        this.absolute_i(cpu.x, true);
+        this.absolute_i_rw(cpu.x, true);
         if (this.opCycle === 5) {
             cpu.write(addr, oper);
         }
@@ -786,7 +836,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.inc_abs_x = function() {
-        this.absolute_i(cpu.x, true);
+        this.absolute_i_rw(cpu.x, true);
         if (this.opCycle === 5) {
             cpu.write(addr, oper);
         }
@@ -1033,7 +1083,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.lsr_abs_x = function() {
-        this.absolute_i(cpu.x, true);
+        this.absolute_i_rw(cpu.x, true);
 
         if (this.opCycle === 5) {
             cpu.write(addr, oper);
@@ -1189,7 +1239,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.rol_abs_x = function() {
-        this.absolute_i(cpu.x, true);
+        this.absolute_i_rw(cpu.x, true);
         if (this.opCycle === 5) {
             cpu.write(addr, oper);
         }
@@ -1239,7 +1289,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.ror_abs_x = function() {
-        this.absolute_i(cpu.x, true);
+        this.absolute_i_rw(cpu.x, true);
         if (this.opCycle === 5) {
             cpu.write(addr, oper);
         }
@@ -1396,7 +1446,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.sta_abs_x = function() {
-        this.absolute_i(cpu.x, false);
+        this.absolute_i_rw(cpu.x, false);
         if (this.opCycle === 4) {
             cpu.write(addr, cpu.a);
             this.reset_cycles();
@@ -1404,7 +1454,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.sta_abs_y = function() {
-        this.absolute_i(cpu.y, false);
+        this.absolute_i_rw(cpu.y, false);
         if (this.opCycle === 4) {
             cpu.write(addr, cpu.a);
             this.reset_cycles();
@@ -1420,7 +1470,7 @@ const Cpu6502 = function(nes, cpu) {
     };
 
     this.sta_ind_y = function() {
-        this.indirect_y(false);
+        this.indirect_y_rw(false);
         if (this.opCycle === 5) {
             cpu.write(addr, cpu.a);
             this.reset_cycles();

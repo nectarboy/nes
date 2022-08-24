@@ -28,6 +28,8 @@ const Cartridge = function(nes, mem) {
             }
         },
 
+        feedAddr(addr) {},
+
         reset() {
 
         }
@@ -42,10 +44,11 @@ const Cartridge = function(nes, mem) {
         rommode: 0,
         rombank: 0,
         romwhole: false,
-        rombank0: 0,
-        rombank1: 0,
-        rombank0addr: 0,
-        rombank1addr: 0,
+
+        rombanks: new Array(2),
+        rombankaddr: new Array(2),
+        romaddrmask: 0,
+        rombankmask: 0,
 
         chrwhole: false,
         chrbank0: 0,
@@ -57,12 +60,9 @@ const Cartridge = function(nes, mem) {
         nametablemirroring: 0,
 
         read(addr) {
-            if (addr < 0x6000)
-                return 0; // TODO: openbus
-
             // CARTRAM
             if (addr < 0x8000) {
-                if (this.ramenabled) {
+                if (this.ramenabled && addr >= 0x6000) {
                     return mem.cartram[(addr-0x6000) & mem.cartramSizeMask];
                 }
                 else {
@@ -70,24 +70,24 @@ const Cartridge = function(nes, mem) {
                 }
             }
             // ROM
-            else if (this.romwhole) {
-                return mem.rom[((addr & 0x7fff) + this.rombank0addr) & mem.romSizeMask];
-            }
             else {
-                if (addr < 0xc000) {
-                    return mem.rom[((addr & 0x3fff) + this.rombank0addr) & mem.romSizeMask];
-                }
-                else {
-                    return mem.rom[((addr & 0x3fff) + this.rombank1addr) & mem.romSizeMask];
-                }
+                return mem.rom[((addr & this.romaddrmask) + this.rombankaddr[(addr & this.rombankmask) >> 14]) & mem.romSizeMask];
             }
+            // else if (this.romwhole) {
+            //     return mem.rom[((addr & 0x7fff) + this.rombankaddr[0]) & mem.romSizeMask];
+            // }
+            // else {
+            //     if (addr < 0xc000) {
+            //         return mem.rom[((addr & 0x3fff) + this.rombankaddr[0]) & mem.romSizeMask];
+            //     }
+            //     else {
+            //         return mem.rom[((addr & 0x3fff) + this.rombankaddr[1]) & mem.romSizeMask];
+            //     }
+            // }
         },
         write(addr, val) {
-            if (addr < 0x6000)
-                return;
-
             if (addr < 0x8000) {
-                if (this.ramenabled) {
+                if (this.ramenabled && addr >= 0x6000) {
                     mem.cartram[(addr-0x6000) & mem.cartramSizeMask] = val;
                 }
             }
@@ -182,23 +182,32 @@ const Cartridge = function(nes, mem) {
         fixRomBanks() {
             // (2) $8000 bank fixed, $C000 switchable
             if (this.rommode === 2) {
-                this.rombank0 = 0;
+                this.rombanks[0] = 0;
 
-                this.rombank1 = this.rombank;
-                this.rombank1addr = this.rombank1 * 0x4000;
+                this.rombanks[1] = this.rombank;
+                this.rombankaddr[1] = this.rombanks[1] * 0x4000;
+
+                this.romaddrmask = 0x3fff;
+                this.rombankmask = 0x7fff;
             }
             // (3 OR < 2) $8000 switchable, $C000 fixed
             else {
-                this.rombank0 = this.rombank;
+                this.rombanks[0] = this.rombank;
 
                 if (this.romwhole) {
-                    this.rombank0addr = (this.rombank0 & (~1)) * 0x8000;
+                    this.rombankaddr[0] = (this.rombanks[0] & (~1)) * 0x8000;
+
+                    this.romaddrmask = 0x7fff;
+                    this.rombankmask = 0x3fff;
                 }
                 else {
-                    this.rombank0addr = this.rombank0 * 0x4000;
+                    this.rombankaddr[0] = this.rombanks[0] * 0x4000;
 
-                    this.rombank1 = 0|(mem.romSize / 0x4000) - 1;
-                    this.rombank1addr = this.rombank1 * 0x4000;
+                    this.rombanks[1] = 0|(mem.romSize / 0x4000) - 1;
+                    this.rombankaddr[1] = this.rombanks[1] * 0x4000;
+
+                    this.romaddrmask = 0x3fff;
+                    this.rombankmask = 0x7fff;
                 }
             }
         },
@@ -235,6 +244,8 @@ const Cartridge = function(nes, mem) {
             }
         },
 
+        feedAddr(addr) {},
+
         // reset
         reset() {
             this.shiftreg = 0x10;
@@ -263,7 +274,14 @@ const Cartridge = function(nes, mem) {
         ppubankaddr: new Array(6),
         ppuinvert: false,
 
+        ramenabled: false,
+        ramwriteallow: false,
+
+        a12: 0,
         irqcounter: 0,
+        irqreloadval: false,
+        irqstart: false,
+        irqenabled: false,
 
         fixCpuAddr() {
             if (this.cpuinvert) {
@@ -312,12 +330,9 @@ const Cartridge = function(nes, mem) {
         },
 
         read(addr) { // TODO: SWITCH STATEMENT PLSSSSSS
-            if (addr < 0x6000)
-                return 0; // OPENBUS
-
             // Cart Ram
             if (addr < 0x8000) {
-                if (true) {
+                if (this.ramenabled && addr >= 0x6000) {
                     return mem.cartram[(addr-0x6000) & mem.cartramSizeMask];
                 }
                 else {
@@ -340,12 +355,9 @@ const Cartridge = function(nes, mem) {
             }
         },
         write(addr, val) {
-            if (addr < 0x6000)
-                return;
-
             // Cartram
             if (addr < 0x8000) {
-                if (true) {
+                if (this.ramwriteallow && addr >= 0x6000) {
                     mem.cartram[(addr-0x6000) & mem.cartramSizeMask] = val;
                 }
             }
@@ -376,29 +388,35 @@ const Cartridge = function(nes, mem) {
                     case 0x5: {
                         if (addr & 1) {
                             // PRG RAM Protect (odd)
+                            this.ramenabled = (val & 0x80) !== 0;
+                            this.ramwriteallow = (val & 0x40) === 0;
                         }
                         else {
                             // Mirroring (even)
-                            console.log(val);
                             this.fixMirroring(val);
                         }
                         break;
                     }
                     case 0x6: {
                         if (addr & 1) {
-                            // Bank data (odd)
+                            // IRQ Reload (odd)
+                            this.irqstart = true; // reload it on next clock
                         }
                         else {
-                            // Bank Select (even)
+                            // IRQ Latch Value (even)
+                            this.irqreloadval = val;
                         }
                         break;
                     }
                     case 0x7: {
                         if (addr & 1) {
-                            // Bank data (odd)
+                            // IRQ Enable (odd)
+                            this.irqenabled = true;
                         }
                         else {
-                            // Bank Select (even)
+                            // IRQ Disable (even)
+                            this.irqenabled = false;
+                            // (Acknowledge pending interrupt)
                         }
                         break;
                     }
@@ -455,6 +473,33 @@ const Cartridge = function(nes, mem) {
         writeChr(addr, val) {
             if (mem.hasChrRam) {
                 mem.chr[addr & mem.chrSizeMask] = val; // 16KB CHR RAM
+            }
+        },
+
+        feedAddr(addr) {
+            var lasta12 = this.a12;
+            this.a12 = addr & 0x2000;
+
+            // When rising edge happens on PPU ADDR BUS ...
+            if (lasta12 === 0 && this.a12 === 0x2000) {
+                if (this.irqstart) {
+                    this.irqstart = false;
+                    this.irqcounter = this.irqreloadval;
+                }
+                else if (this.irqcounter === 0) {
+                    this.irqcounter = this.irqreloadval;
+
+                    if (this.irqenabled) {
+                        nes.cpu.requestIrq();
+                    }
+                }
+                else {
+                    this.irqcounter--;
+
+                    // if (this.irqcounter === 0 && this.irqenabled) {
+                    //     nes.cpu.requestIrq();
+                    // }
+                }
             }
         },
 

@@ -25,17 +25,18 @@ function startNESWithRomBuff(romBuff) {
     var fail = false;
 
     // romBuff should be a Uint8Array buffer
-    nes.stop();
+    //nes.stop();
     try {
         nes.loadRomBuff(romBuff);
     }
     catch (e) {
         fail = true;
         setStatus(e.toString(), 1);
+        throw e;
     }
-    nes.start();
 
     if (!fail) {
+        nes.start();
         setStatus('Loaded ROM!', 0);
     }
 }
