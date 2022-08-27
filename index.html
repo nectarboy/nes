@@ -32,16 +32,26 @@
                 <div style='padding: 4px'>
                     <div id='settingsdiv' style='display: inline;'>
                         <!-- <button id='choppy' class='Button' title='[DEBUG] Runs at 10 FPS'>CHOPPY</button> -->
-                        <button id='frameskip' class='Button' title='(Turn this off if bad freezing or stuttering)'>Frameskip</button>
-                        <button id='fullscreen' class='Button' title='Toggle fullscreen'>Fullscreen</button>
+                        <label for='rominput' class='FileButton' title='Select a rom :D'>Select ROM</label>
+                        <input id='rominput' type='file' style='display: none;'>
+                        <label for='saveinput' class='FileButton' title='Load a .SAV file (RESETS GAME)'>Load SAVE</label>
+                        <input id='saveinput' type='file' accept='.sav, .dmp, .bin' style='display: none;'>
+
+                        <span>Pitch Shift:</span>
+                        <span id='pitchshiftreset' class='SmallButton' title='Reset pitch shift'>↻</span>
+                        <span id='pitchshiftsub' class='SmallButton' title='Lower pitch shift'>-</span>
+                        <span id='pitchshiftadd' class='SmallButton' title='Higher pitch shift'>+</span>
+                        <input id='pitchshift' class='Range' type='range' max='30' min='-30' step='1' title='(NOTE: This alters actual APU timers)'>
+
+                        <span id='frameskip' class='Button' title='(Turn this off if bad freezing or stuttering)'>Frameskip</span>
+                        <span id='fullscreen' class='Button' title='Toggle fullscreen'>Fullscreen</span>
                     </div>
-                    <span><button id='minimize' class='SmallButton'><</button></span>
+                    <span id='minimize' class='SmallButton'><</span>
                 </div>
             </div>
 
             <!-- File Select -->
             <div>
-                <input id='rominput' type='file' class='FileSelect' title='Select a rom :D'>
             </div>
         </div>
     </div>

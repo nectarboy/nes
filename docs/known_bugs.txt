@@ -6,8 +6,12 @@ CPU:
 PPU:
 - PPU timings are off (blarg says so)
 
+APU:
+- Audio playback is slightly offtune at higher frequencies
+(this is intentional; as a tradeoff, audio is more stable and doesnt click nearly as often. idk how to fix the slight offtune but whatever)
+
 MMC3:
-- scanline counter is off by 1 woooow
+- scanline counter is BUGGY woooooow
 
 -----------------------------------------
 [FIXED] SUPER MARIO BROS: death jingle fixed ^-^
@@ -19,11 +23,15 @@ cause: also sweep bug
 [FIXED] TETRIS: '0' character fixed ^-^
 cause: MMC1 overwrote chr rom
 
+BATTLETOADS: graphical glitches
+suspected: innacurate ppu timings ?? if the cpu timings seem ok it leaves 1 culprit left
+
 DOUBLE DRAGON: the intro with the girl getting kidnapped flickers with the menu bar going up
-theory: cpu is somehow too slow to catch sprite 0 hitting
+suspected: cpu is somehow too slow to catch sprite 0 hitting ?? or maybe ppu too fast
+could also be me missing openbus who knows lol
 
 KIRBY'S ADVENTURE: status bar flickers
-cause: scanline counter wow!!!!
+cause: scanline counter wow!!!
 
 -----------------------------------------
 if you see any bugs, please open an issue on the github !

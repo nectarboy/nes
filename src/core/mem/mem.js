@@ -455,6 +455,7 @@ const Mem = function(nes) {
     this.cartramSize = 0;
     this.romSizeMask = 0;
     this.hasChrRam = false;
+    this.hasExtraRam = false;
     this.chrSizeMask = 0;
     this.cartramSizeMask = 0;
 
@@ -467,6 +468,23 @@ const Mem = function(nes) {
 
         var rom = new Uint8Array(romBuff);
         this.loadRomProps(rom);
+    };
+
+    this.loadSaveBuff = function(savebuff) {
+        if (!this.hasExtraRam) {
+            throw 'ROM doesn\'t have save files!';
+            return false;
+        }
+
+        savebuff = new Uint8Array(savebuff);
+        var length = Math.min(savebuff.length, this.cartram.length);
+        for (var i = 0; i < length; i++) {
+            this.cartram[i] = savebuff[i];
+        }
+
+        console.log('Loaded save file', savebuff);
+
+        return true;
     };
 
     this.loadRomIntoMem = function(rom) {
@@ -549,6 +567,8 @@ const Mem = function(nes) {
             this.nametable2map = 1;
             this.nametable3map = 1;
         }
+
+        this.hasExtraRam = (rom[6] & 0x2) !== 0;
 
         this.rawfilerom = rom;
         this.loadRomIntoMem(rom);

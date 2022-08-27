@@ -36,15 +36,46 @@ html, body {
 }
 
 /* Settings */
+.FileButton, .Button, .SmallButton {
+    font-family: arial;
+    font-size: 13px;
+
+    position: relative;
+    display: inline-block;
+
+    height: 28px;
+    line-height: 28px;
+    text-align: center;
+
+    user-select: none;
+
+    background-image: linear-gradient(to bottom, #e4e4e4, #f7f7f7);
+    border: 1px solid #aaaaaa;
+    border-radius: 2px;
+}
+.FileButton:hover, .Button:hover, .SmallButton:hover {
+    background-image: linear-gradient(to bottom, #d4d4d4, #e7e7e7);
+}
+.FileButton:active, .Button:active, .SmallButton:active {
+    background-image: linear-gradient(to bottom, #f4f4f4, #ffffff);
+}
+
+.FileButton {
+    display: ;
+    width: 100px;
+    height: 28px;
+}
 .Button {
     width: 80px;
     height: 28px;
-    user-select: none;
 }
 .SmallButton {
-    width: 32px;
+    width: 28px;
     height: 28px;
+}
+.Range {
     user-select: none;
+    width: 180px;
 }
 .ButtonDiv {
     position: absolute;
@@ -56,3 +87,4 @@ html, body {
 .FileSelect {
     user-select: none;
 }
+

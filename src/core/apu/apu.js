@@ -26,7 +26,7 @@ function Apu(nes) {
     this.buff = {};
     this.buffData = {};
     this.updateBuffInterval = function() {
-        this.buffInterval = 0|(nes.cpu.cyclesPerSec / this.sampleRate);
+        this.buffInterval = (nes.cpu.cyclesPerSec / this.sampleRate);
     };
     this.generateBuffer = function(length, sampleRate) {
         const buffNumber = 5;
@@ -69,16 +69,16 @@ function Apu(nes) {
                 this.currentBuff = 0;
             }
 
-            if (this._currentTime <= this.ctx.currentTime - this.buff[buff].duration || this._currentTime >= this.ctx.currentTime + this.buff[buff].duration*3) {
-                console.log('Buffer straying too far! Catching up', this._currentTime, this.ctx.currentTime);
+            var timeOffset = this.buff[buff].duration / 3;
+            if (this._currentTime <= this.ctx.currentTime - timeOffset || this._currentTime >= this.ctx.currentTime + timeOffset) {
+                //console.log('Buffer straying too far! Catching up', this._currentTime, this.ctx.currentTime);
                 this._currentTime = this.ctx.currentTime; // The buffer is more often than not ahead of ctx.currentTime it seems
             }
+            this._currentTime += this.buff[buff].duration;
             var src = this.ctx.createBufferSource();
             src.buffer = this.buff[buff];
             src.connect(this.gainNode);
             src.start(this._currentTime);
-            this._currentTime += this.buff[buff].duration;
-
 
             // Method 2 - (stable and satisfactory)
             // var buff = this.currentBuff++;
@@ -121,6 +121,7 @@ function Apu(nes) {
     };
 
     // =============== // Channel Registers //
+    this.pitchshift = 0; // (DISCLAIMER THIS IS NOT ACTUAL PART OF NES; THIS IS JUST FOR FUN :DDDD)
 
     this.lengthtable = [
         // (copied from https://www.nesdev.org/wiki/APU_Length_Counter)
@@ -229,7 +230,7 @@ function Apu(nes) {
             updateFreq() {
                 this.freq--;
                 if (this.freq <= 0) {
-                    this.freq = this.freqreload;
+                    this.freq = 0|(this.freqreload * apu.pitchshift);
 
                     this.dutystep++;
                     this.dutystep &= 7;
@@ -322,7 +323,7 @@ function Apu(nes) {
         updateFreq() {
             this.freq--;
             if (this.freq <= 0) {
-                this.freq = this.freqreload;
+                this.freq = 0|(this.freqreload * apu.pitchshift);
 
                 this.step++;
                 this.step &= 0x1f;
@@ -413,7 +414,7 @@ function Apu(nes) {
         updateFreq() {
             this.freq--;
             if (this.freq <= 0) {
-                this.freq = this.freqreload;
+                this.freq = 0|(this.freqreload * apu.pitchshift);
 
                 // Pseudo random shi
                 var feedback = (this.shift & 1) ^ (1&(this.shift >> this.shiftbit));
@@ -616,7 +617,7 @@ function Apu(nes) {
         this.tri.updateFreq();
 
         // Buffering
-        this.buffTick += 1;
+        this.buffTick++;
         if (this.buffTick >= this.buffInterval) {
             this.buffTick -= this.buffInterval;
             this.stepBuffer();
@@ -626,6 +627,7 @@ function Apu(nes) {
     // =============== // Reset //
     this.reset = function() {
         // Buffering
+        this._currentTime = 0;
         this.currentBuff = 0;
         this.buffStep = 0; // which buffer sample we on
         this.buffTick = 0; // used to keep track how often we should step buffer

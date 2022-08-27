@@ -64,6 +64,10 @@ const NES = function() {
         }
     };
 
+    this.setPitchShift = function(semitones) {
+        this.apu.pitchshift = Math.pow(2, (semitones/24));
+    };
+
     this.canvas = null;
     this.attachCanvas = function(canvas) {
         this.canvas = canvas;
@@ -136,6 +140,12 @@ const NES = function() {
         this.reset();
     };
 
+    this.loadSaveBuff = function(save) {
+        if (this.mem.loadSaveBuff(save)) { // If successful
+            this.reset();
+        }
+    };
+
     // =============== // Event Latches //
     this.onkeypause = () => {};
     this.onkeyreset = () => {};
@@ -160,6 +170,7 @@ const NES = function() {
     this.resetFPS();
     this.setFrameskip(true);
     this.apu.generateBuffer(4096, 48000);
+    this.setPitchShift(0);
     this.joypad.keyboardAPI.start();
     this.reset();
 };
