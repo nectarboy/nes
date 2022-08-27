@@ -244,12 +244,13 @@ const Ppu = function(nes) {
                 }
 
                 // Update PPU addr for next scanline
-                else if (lx === 256) {
+                else if (lx === 259) { // 256, (259 is a hack)
                     this.incAllY();
+                    nes.mem.mapper.feedAddr(this.ppuAddr);
 
                     // Copy horizontal scroll
                     this.ppuAddr &= 0b0111101111100000;
-                    this.ppuAddr |= this.tAddr & 0b0000010000011111;
+                    this.ppuAddr |= this.tAddr & 0b0000010000011111;               
 
                     // This is supposed to happen on cycle 304 but what fuckin ever
                     if (this.preRender) {
@@ -329,12 +330,13 @@ const Ppu = function(nes) {
             // Vblank scanlines (241 - 260)
             else {
 
-                if (this.ly === 241 && this.cycles === 1) {
+                if (this.ly === 241 && this.cycles === 0) {
                     this.vblankFlag = true; // Read / Used for NMI``
                 }
 
                 // Vblank NMIs !
                 if (this.considerNmiEnabled && this.vblankFlag) {
+                    //this.vblankFlag = false;
                     this.considerNmiEnabled = false;
                     nes.cpu.requestNMI();
                 }
@@ -372,7 +374,7 @@ const Ppu = function(nes) {
         this.sprite0Atm = false;
         this.sprite0Happened = false;
         this.vblankAtm = false;
-        this.vblankFlag = false;
+        //this.vblankFlag = false;
 
         this.cycles = 0;
         this.preRender = true;
@@ -402,18 +404,18 @@ const Ppu = function(nes) {
             );
 
             var palMemAddr = 0x3f00 | (region << 2) | bit;
-            nes.mem.mapper.feedAddr(palMemAddr);
+            //nes.mem.mapper.feedAddr(palMemAddr);
             return this.readPallete(palMemAddr);
         }
         else {
-            nes.mem.mapper.feedAddr(0x3f00);
+            //nes.mem.mapper.feedAddr(0x3f00);
             return this.readPallete(0x3f00);
         }
     };
 
     this.getBgPixel = function(lx) {
         if (this.bgEnabled === false) {
-            nes.mem.mapper.feedAddr(0x3f00);
+            //nes.mem.mapper.feedAddr(0x3f00);
             return this.readPallete(0x3f00);
         }
 
@@ -433,26 +435,26 @@ const Ppu = function(nes) {
             px = this.mixBgPixel(lx, bit, this.preAttr);
         }
 
-        this.bgMap[this.ly * constants.screen_width + lx] = bit;
+        this.bgMap[this.ly * 256 + lx] = bit;
         return px;
     };
 
     // Sprite rendering
     this.getSpritePixel = function(lx, px) {
         for (var i = 0; i < this.spritesThisLine; i++) {
-            const oami = i * 4;
+            const oami = i << 2;
 
             if (lx >= this.sX[i] && lx < this.sX[i] + 8) {
-                const sdatai = i * 2;
+                var sdatai = i << 1;
 
-                const xpx = lx - this.sX[i];
-                const ypx = this.ly - this.sOam[oami];
+                var xpx = lx - this.sX[i];
+                var ypx = this.ly - this.sOam[oami];
 
-                const shift = this.sAttr[i].xflip
+                var shift = this.sAttr[i].xflip
                     ? xpx & 7
                     : (xpx & 7) ^ 7;
 
-                const bit = (((this.sData[sdatai+1] >> shift) & 1) << 1) | ((this.sData[sdatai] >> shift) & 1);
+                var bit = (((this.sData[sdatai+1] >> shift) & 1) << 1) | ((this.sData[sdatai] >> shift) & 1);
 
                 if (bit) {
                     // Sprite 0 check
@@ -462,12 +464,12 @@ const Ppu = function(nes) {
                     }
 
                     // Priority check
-                    if (this.sAttr[i].priority && this.bgMap[this.ly * constants.screen_width + lx])
+                    if (this.sAttr[i].priority && this.bgMap[this.ly * 256 + lx])
                         continue;
 
-                    const palMemAddr = 0x3f10 | (this.sAttr[i].pallete << 2) | bit;
+                    var palMemAddr = 0x3f10 | (this.sAttr[i].pallete << 2) | bit;
 
-                    nes.mem.mapper.feedAddr(palMemAddr);
+                    //nes.mem.mapper.feedAddr(palMemAddr);
                     return this.readPallete(palMemAddr);
                 }
             }
@@ -725,6 +727,17 @@ const Ppu = function(nes) {
         for (var i = 0; i < 4; i++) {
             for (var ii = 0; ii < 16; ii++) {
                 this.rendering.drawPx(ii, i, i*16 + ii);
+            }
+        }
+
+        this.rendering.renderImg();
+    };
+
+    this.debugDrawBgMap = function(nt=0) {
+        for (var x = 0; x < 256; x++) {
+            for (var y = 0; y < 240; y++) {
+                var px = this.bgMap[y * 256 + x];
+                this.rendering.drawPx(x, y, 0|(px > 0));
             }
         }
 

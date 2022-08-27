@@ -69,7 +69,7 @@ const Mem = function(nes) {
                 nes.apu.sq1.volreload = val & 0xf;
 
                 // update sq1 volume
-                nes.apu.sq1.vol = (nes.apu.sq1.constantvol ? nes.apu.sq1.volreload : nes.apu.sq1.envvol) / 15;
+                nes.apu.sq1.vol = (nes.apu.sq1.constantvol ? nes.apu.sq1.volreload : nes.apu.sq1.envvol);
                 nes.apu.sq1.calcMasterVol();
                 break;
             }
@@ -114,7 +114,7 @@ const Mem = function(nes) {
                 nes.apu.sq2.volreload = val & 0xf;
 
                 // update sq2 volume
-                nes.apu.sq2.vol = (nes.apu.sq2.constantvol ? nes.apu.sq2.volreload : nes.apu.sq2.envvol) / 15;
+                nes.apu.sq2.vol = (nes.apu.sq2.constantvol ? nes.apu.sq2.volreload : nes.apu.sq2.envvol);
                 nes.apu.sq2.calcMasterVol();
                 break;
             }
@@ -151,6 +151,54 @@ const Mem = function(nes) {
                 break;
             }
 
+            // ---- TRIANGLE CHANNEL
+            case 0x4008: { // SETUP
+                nes.apu.tri.lengthhalt = (val & 0x80) !== 0;
+                nes.apu.tri.linreloadval = val & 0x7f;
+                break;
+            }
+            case 0x400a: { // TIMER LOW
+                nes.apu.tri.freqreload &= 0x700;
+                nes.apu.tri.freqreload |= val;
+
+                nes.apu.tri.freqplaying = 0|(nes.apu.tri.freqreload >= 2);
+                nes.apu.tri.calcMasterVol();
+                break;
+            }
+            case 0x400b: { // TIMER HI + LENGTH
+                nes.apu.tri.freqreload &= 0xff;
+                nes.apu.tri.freqreload |= (val & 7) << 8;
+
+                nes.apu.tri.freqplaying = 0|(nes.apu.tri.freqreload >= 2);
+                nes.apu.tri.calcMasterVol();
+
+                // Length
+                nes.apu.tri.writeLength(val >> 3);
+                nes.apu.tri.linstart = true;
+                break;
+            }
+
+            // ---- NOISE CHANNEL
+            case 0x400c: { // ENVELOPE
+                nes.apu.noi.lengthhalt = (val & 0x20) !== 0;
+                nes.apu.noi.constantvol = (val & 0x10) !== 0;
+                nes.apu.noi.volreload = val & 0xf;
+
+                nes.apu.noi.vol = (nes.apu.noi.constantvol ? nes.apu.noi.volreload : nes.apu.noi.envvol);
+                nes.apu.noi.calcMasterVol(); // i repeated this 3 times i wonder if i should make this a function .... nyeeeeeeeh
+                break;
+            }
+            case 0x400e: { // FREQ
+                nes.apu.noi.shiftbit = 1 + 5 * (val >> 7);
+                nes.apu.noi.freqreload = nes.apu.noi.freqtable[val & 0xf];
+                break;
+            }
+            case 0x400f: { // LENGTH
+                nes.apu.noi.writeLength(val >> 3);
+                nes.apu.noi.volstart = true;
+                break;
+            }
+
             case 0x4014: { // OAMDMA
                 // Hacky DMA ,,, only for now ok u_u
                 var cpuAddr = val << 8;
@@ -172,6 +220,16 @@ const Mem = function(nes) {
                     nes.apu.sq2.silence();
                 else
                     nes.apu.sq2.enable();
+
+                if ((val & 0x4) === 0)
+                    nes.apu.tri.silence();
+                else
+                    nes.apu.tri.enable();
+
+                if ((val & 0x8) === 0)
+                    nes.apu.noi.silence();
+                else
+                    nes.apu.noi.enable();
                 break;
             }
 
@@ -258,11 +316,11 @@ const Mem = function(nes) {
             }
             case 7: { // PPUDATA
                 var ppuaddr = nes.ppu.ppuAddr & 0x3fff;
-                nes.mem.mapper.feedAddr(ppuaddr);
 
                 nes.ppu.ppuAddr += this.ppuAddrInc;
                 nes.ppu.ppuAddr &= 0xffff;
 
+                this.mapper.feedAddr(ppuaddr);
                 return nes.ppu.readFromCPU(ppuaddr);
                 break;
             }
@@ -331,17 +389,19 @@ const Mem = function(nes) {
 
                     nes.ppu.tAddr |= (val >> 3) << 5; // Coarse y
                     nes.ppu.tAddr |= (val & 7) << 12; // Fine y
+
+                    this.ppuLatch = false;
                 }
                 // Update x scroll
                 else {
                     // Update x scroll
                     nes.ppu.tAddr &= 0b0111111111100000;
 
-                    nes.ppu.tAddr |= (val >> 3);  // Coarse x
+                    nes.ppu.tAddr |= (val >> 3);    // Coarse x
                     nes.ppu.fineX = (val & 7);      // Fine x
-                }
 
-                this.ppuLatch = !this.ppuLatch;
+                    this.ppuLatch = true;
+                }
                 break;
             }
             case 6: { // PPUADDR
@@ -350,6 +410,7 @@ const Mem = function(nes) {
                     nes.ppu.tAddr |= val;
 
                     nes.ppu.ppuAddr = nes.ppu.tAddr; // Update ppu addr
+                    this.mapper.feedAddr(nes.ppu.ppuAddr);
                 }
                 else {
                     nes.ppu.tAddr &= 0x00ff;
@@ -360,7 +421,9 @@ const Mem = function(nes) {
                 break;
             }
             case 7: { // PPUDATA
-                nes.ppu.write(nes.ppu.ppuAddr & 0x3fff, val);
+                var addr = nes.ppu.ppuAddr & 0x3fff;
+                this.mapper.feedAddr(addr);
+                nes.ppu.write(addr, val);
 
                 nes.ppu.ppuAddr += this.ppuAddrInc;
                 nes.ppu.ppuAddr &= 0xffff;
@@ -407,7 +470,6 @@ const Mem = function(nes) {
     };
 
     this.loadRomIntoMem = function(rom) {
-        this.rawfilerom = rom;
 
         // If no errors have occured in loadRomProps, we should be good to go !
         this.rom = new Uint8Array(this.romSize);
@@ -429,7 +491,6 @@ const Mem = function(nes) {
 
     // Loading mappers
     this.loadMapper = function(mapperId) {
-
         this.mapperId = mapperId;
         this.mapper = this.cartridge.mappers[mapperId];
         // this.readCart = (addr) => this.mapper.read(addr);
@@ -489,6 +550,7 @@ const Mem = function(nes) {
             this.nametable3map = 1;
         }
 
+        this.rawfilerom = rom;
         this.loadRomIntoMem(rom);
         this.loadMapper(mapperId);
     };

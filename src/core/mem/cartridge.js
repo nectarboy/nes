@@ -481,40 +481,106 @@ const Cartridge = function(nes, mem) {
             this.a12 = addr & 0x2000;
 
             // When rising edge happens on PPU ADDR BUS ...
-            if (lasta12 === 0 && this.a12 === 0x2000) {
-                if (this.irqstart) {
-                    this.irqstart = false;
-                    this.irqcounter = this.irqreloadval;
-                }
-                else if (this.irqcounter === 0) {
-                    this.irqcounter = this.irqreloadval;
+            if (!lasta12 && this.a12) {
+                // if (this.irqstart) {
+                //     this.irqstart = false;
+                //     this.irqcounter = this.irqreloadval;
+                // }
+                // else if (this.irqcounter === 0) {
+                //     this.irqcounter = this.irqreloadval;
 
-                    if (this.irqenabled) {
-                        nes.cpu.requestIrq();
-                    }
+                //     // if (this.irqenabled) {
+                //     //     nes.cpu.requestIrq();
+                //     // }
+                // }
+                // else {
+                //     this.irqcounter--;
+
+                //     if (this.irqcounter == 0 && this.irqenabled)
+                //         nes.cpu.requestIrq();
+                // }
+
+                var counter = this.irqcounter;
+                if (this.irqcounter === 0 || this.irqstart) {
+                    this.irqcounter = this.irqreloadval;
                 }
                 else {
                     this.irqcounter--;
-
-                    // if (this.irqcounter === 0 && this.irqenabled) {
-                    //     nes.cpu.requestIrq();
-                    // }
                 }
+
+                if ((counter > 0 || this.irqstart) && this.irqcounter == 0 && this.irqenabled) {
+                    nes.cpu.requestIrq();
+                }
+
+                this.irqstart = false;
             }
         },
 
         reset() {
+            this.ramenabled = false;
+            this.ramwriteallow = false;
+
             this.bankselected = 0;
             this.banks.fill(0);
             this.cpubankaddr.fill(0);
             this.ppubankaddr.fill(0);
+            this.cpuinvert = false;
+            this.ppuinvert = false;
             this.fixCpuAddr();
             this.fixPpuAddr();
             this.fixMirroring(0);
+
+            this.a12 = 0;
+            this.irqcounter = 0;
+            this.irqreloadval = false;
+            this.irqstart = false;
+            this.irqenabled = false;
         }
     };
 
     //this.mappers[4] = this.mappers[0]; // debug hehe
+
+    // AxROM
+    this.mappers[7] = {
+        romoffset: 0,
+
+        read(addr) {
+            if (addr < 0x8000) {
+                return 0; // (OPENBUS)
+            }
+            else {
+                return mem.rom[((addr & 0x7fff) + this.romoffset) & mem.romSizeMask]; // rom
+            }
+        },
+        write(addr, val) {
+            if (addr < 0x8000) {
+                return 0; // (OPENBUS)
+            }
+            else {
+                this.romoffset = (val & 7) << 15;
+
+                var nametable = (val & 0x10) >> 4;
+                mem.nametable0map = nametable;
+                mem.nametable1map = nametable;
+                mem.nametable2map = nametable;
+                mem.nametable3map = nametable;
+            }
+        },
+        readChr(addr) {
+            return mem.chr[addr & mem.chrSizeMask];
+        },
+        writeChr(addr, val) {
+            if (mem.hasChrRam) {
+                mem.chr[addr & mem.chrSizeMask] = val; // 16KB CHR RAM
+            }
+        },
+
+        feedAddr(addr) {},
+
+        reset() {
+            this.write(0x8000, 0);
+        }
+    };
 };
 
 export default Cartridge;

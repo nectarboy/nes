@@ -146,9 +146,7 @@ const Cpu = function(nes) {
             case 7:
                 this.pc |= this.read(this.intVec + 1) << 8;
 
-                this.intCycle = 0;
                 this.interrupting = false;
-                this.shouldInterrupt = false;
                 this.isNMI = false;
                 break;
         }
@@ -156,8 +154,8 @@ const Cpu = function(nes) {
 
     // Interrupt generation
     this.requestIrq = function() {
-        if (this.isNMI)
-            return;
+        // if (this.isNMI)
+        //     return;
 
         this.intVec = 0xfffe;
         this.shouldInterrupt = true;
@@ -180,7 +178,9 @@ const Cpu = function(nes) {
             else {
                 // Check for interrupts (if done with inst and flipflop set, next 'inst' will be int)
                 if (this.cpu6502.execute() && this.shouldInterrupt) {
+                    this.shouldInterrupt = false;
                     this.interrupting = true;
+                    this.intCycle = 0;
                 }
             }
 
