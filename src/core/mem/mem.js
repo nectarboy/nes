@@ -460,30 +460,36 @@ const Mem = function(nes) {
     this.cartramSizeMask = 0;
 
     // Loading cart
-    this.loadRomBuff = function(romBuff) {
-        if (typeof romBuff !== 'object') {
+    this.loadRomBuff = function(rombuff) {
+        if (typeof rombuff !== 'object') {
             throw 'This is not a ROM!';
             return;
         }
 
-        var rom = new Uint8Array(romBuff);
-        this.loadRomProps(rom);
+        rombuff = new Uint8Array(rombuff);
+        this.loadRomProps(rombuff);
     };
 
     this.loadSaveBuff = function(savebuff) {
+        if (typeof savebuff !== 'object') {
+            throw 'This is not a SAVE!';
+            return;
+        }
+
         if (!this.hasExtraRam) {
-            throw 'ROM doesn\'t have save files!';
+            throw 'This ROM doesn\'t have save files!';
             return false;
         }
 
         savebuff = new Uint8Array(savebuff);
         var length = Math.min(savebuff.length, this.cartram.length);
+
+        this.cartram.fill(0);
         for (var i = 0; i < length; i++) {
             this.cartram[i] = savebuff[i];
         }
 
-        console.log('Loaded save file', savebuff);
-
+        console.log('Loaded save file');
         return true;
     };
 

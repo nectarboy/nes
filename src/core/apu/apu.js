@@ -32,6 +32,7 @@ function Apu(nes) {
         const buffNumber = 5;
         this.buffNumber = buffNumber;
 
+        this.buffStep = 0;
         this.buffLength = length;
         this.sampleRate = sampleRate;
         for (i = 0; i < buffNumber; i++) {

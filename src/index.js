@@ -11,6 +11,7 @@ const saveinput = document.getElementById('saveinput');
 const settingsdiv = document.getElementById('settingsdiv');
 const minimize = document.getElementById('minimize');
 const fullscreen = document.getElementById('fullscreen');
+const antialias = document.getElementById('antialias');
 const frameskip = document.getElementById('frameskip');
 const pitchshift = document.getElementById('pitchshift');
 const pitchshiftreset = document.getElementById('pitchshiftreset');
@@ -75,6 +76,19 @@ fullscreen.onclick = function() {
         canvas.style.position = 'fixed';
         canvas.style.top = '0';
         canvas.style.left = '0';
+    }
+};
+
+// Anti-Alias
+var isantialias = false;
+antialias.onclick = function() {
+    if (isantialias) {
+        isantialias = false;
+        canvas.style.imageRendering = 'pixelated';
+    }
+    else {
+        isantialias = true;
+        canvas.style.imageRendering = 'auto';
     }
 };
 

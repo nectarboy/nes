@@ -263,6 +263,47 @@ const Cartridge = function(nes, mem) {
         }
     };
 
+    // UxROM
+    this.mappers[2] = {
+        rombankaddr: new Array(2),
+
+        read(addr) {
+            if (addr < 0x8000) {
+                return 0; // (OPENBUS)
+            }
+            else {
+                return mem.rom[((addr & 0x3fff) + this.rombankaddr[(addr & 0x7fff) >> 14]) & mem.romSizeMask]; // rom
+            }
+            //      # # #     amogus
+            //          # #
+            //      # # # #
+            //      #   #
+        },
+        write(addr, val) {
+            if (addr < 0x8000) {
+                return 0; // (OPENBUS)
+            }
+            else {
+                this.rombankaddr[0] = val << 14;
+            }
+        },
+        readChr(addr) {
+            return mem.chr[addr & mem.chrSizeMask];
+        },
+        writeChr(addr, val) {
+            if (mem.hasChrRam) {
+                mem.chr[addr & mem.chrSizeMask] = val; // 16KB CHR RAM
+            }
+        },
+
+        feedAddr(addr) {},
+
+        reset() {
+            this.rombankaddr[0] = 0;
+            this.rombankaddr[1] = mem.romSize - 0x4000;
+        }
+    };
+
     // MMC3
     this.mappers[4] = {
         bankselected: 0,
@@ -538,7 +579,7 @@ const Cartridge = function(nes, mem) {
         }
     };
 
-    //this.mappers[4] = this.mappers[0]; // debug hehe
+    this.mappers[90] = this.mappers[4]; // JY Company mapper
 
     // AxROM
     this.mappers[7] = {

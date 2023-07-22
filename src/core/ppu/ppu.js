@@ -441,6 +441,7 @@ const Ppu = function(nes) {
 
     // Sprite rendering
     this.getSpritePixel = function(lx, px) {
+        var lyMul256 = this.ly << 8;
         for (var i = 0; i < this.spritesThisLine; i++) {
             const oami = i << 2;
 
@@ -457,6 +458,8 @@ const Ppu = function(nes) {
                 var bit = (((this.sData[sdatai+1] >> shift) & 1) << 1) | ((this.sData[sdatai] >> shift) & 1);
 
                 if (bit) {
+                    var bgBitOpaque = this.bgMap[lyMul256 + lx] !== 0;
+
                     // Sprite 0 check
                     if (!this.sprite0Atm && this.sNums[i] === 0) {
                         this.sprite0Atm = true;
@@ -464,8 +467,8 @@ const Ppu = function(nes) {
                     }
 
                     // Priority check
-                    if (this.sAttr[i].priority && this.bgMap[this.ly * 256 + lx])
-                        continue;
+                    if (this.sAttr[i].priority && bgBitOpaque)
+                        return px;
 
                     var palMemAddr = 0x3f10 | (this.sAttr[i].pallete << 2) | bit;
 

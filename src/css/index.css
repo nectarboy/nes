@@ -38,13 +38,13 @@ html, body {
 /* Settings */
 .FileButton, .Button, .SmallButton {
     font-family: arial;
-    font-size: 13px;
+    font-size: 12px;
 
     position: relative;
     display: inline-block;
 
-    height: 28px;
-    line-height: 28px;
+    height: 24px;
+    line-height: 24px;
     text-align: center;
 
     user-select: none;
@@ -62,16 +62,13 @@ html, body {
 
 .FileButton {
     display: ;
-    width: 100px;
-    height: 28px;
+    width: 90px;
 }
 .Button {
-    width: 80px;
-    height: 28px;
+    width: 70px;
 }
 .SmallButton {
-    width: 28px;
-    height: 28px;
+    width: 24px;
 }
 .Range {
     user-select: none;
